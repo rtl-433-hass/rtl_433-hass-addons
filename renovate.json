@@ -28,7 +28,8 @@
         "ARG rtl433GitRevision=(?<currentValue>[0-9.]+)"
       ],
       "depNameTemplate": "merbanan/rtl_433",
-      "datasourceTemplate": "github-tags"
+      "datasourceTemplate": "github-tags",
+      "versioningTemplate": "loose"
     }
   ]
 }
