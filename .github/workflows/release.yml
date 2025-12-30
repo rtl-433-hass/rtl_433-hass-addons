@@ -7,7 +7,7 @@ on:
     branches:
       - next
     tags:
-      - '2*'
+      - 'v*'
   schedule:
     # A random daily time, as Actions doesn't have a suggestion for running
     # daily without causing job spikes.
@@ -59,7 +59,7 @@ jobs:
 
     - name: Inject slug/short variables
       uses: rlespinasse/github-slug-action@797d68864753cbceedc271349d402da4590e6302 # v4
- 
+
     - name: Login to Packages Container registry
       uses: docker/login-action@dd4fa0671be5250ee6f50aedf4cb05514abda2c7 # v1
       with:
