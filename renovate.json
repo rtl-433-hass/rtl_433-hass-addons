@@ -5,6 +5,12 @@
     ":preserveSemverRanges",
     "helpers:pinGitHubActionDigests"
   ],
+  "packageRules": [
+    {
+      "matchPackageNames": ["merbanan/rtl_433"],
+      "semanticCommitType": "feat"
+    }
+  ],
   "customManagers": [
     {
       "customType": "regex",
