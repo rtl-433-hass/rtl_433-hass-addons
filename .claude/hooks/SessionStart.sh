@@ -33,9 +33,7 @@ fi
 if ! command -v shellcheck &> /dev/null; then
   echo "Installing shellcheck..."
   if command -v apt-get &> /dev/null; then
-    sudo apt-get update && sudo apt-get install -y shellcheck
-  elif command -v apk &> /dev/null; then
-    sudo apk add shellcheck
+    apt-get install -y shellcheck
   else
     echo "Warning: Could not install shellcheck - no supported package manager found"
   fi
