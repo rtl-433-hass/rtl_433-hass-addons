@@ -48,7 +48,7 @@ jobs:
         sudo apt-get install -y jq
         set -x
         TAG=$(jq '.version' < rtl_433/config.json)
-        ! docker manifest inspect ghcr.io/${{ github.repository}}-${{ matrix.addon }}-{arch}:$TAG > /dev/null
+        ! docker manifest inspect "ghcr.io/${{ github.repository}}-${{ matrix.addon }}-${{ matrix.arch }}:$TAG" > /dev/null
 
     - name: Inject slug/short variables
       uses: rlespinasse/github-slug-action@797d68864753cbceedc271349d402da4590e6302 # v4
