@@ -8,6 +8,14 @@
   "customManagers": [
     {
       "customType": "regex",
+      "managerFilePatterns": ["/^\\.pre-commit-config\\.yaml$/"],
+      "matchStrings": [
+        "repo: https://github\\.com/(?<depName>[^\\s]+?)\\n\\s+rev: (?<currentValue>v[0-9.]+)"
+      ],
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
       "managerFilePatterns": [
         "/^\\.github/workflows/actionlint\\.yml$/",
         "/^\\.claude/hooks/SessionStart\\.sh$/"
