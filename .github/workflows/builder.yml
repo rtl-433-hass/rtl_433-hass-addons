@@ -34,7 +34,7 @@ jobs:
       uses: rlespinasse/github-slug-action@797d68864753cbceedc271349d402da4590e6302 # v4
 
     - name: Checkout the repository
-      uses: actions/checkout@ee0669bd1cc54295c223e0bb666b733df41de1c5 # v2
+      uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
 
     - name: Login to Packages Container registry
       uses: docker/login-action@dd4fa0671be5250ee6f50aedf4cb05514abda2c7 # v1
