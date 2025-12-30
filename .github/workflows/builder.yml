@@ -47,7 +47,6 @@ jobs:
 
     - name: Build ${{ matrix.addon }} ${{ matrix.arch }} image
       uses: home-assistant/builder@master
-      if: github.event.pull_request.head.repo.full_name != github.repository
       with:
         args: |
           --test \
@@ -59,15 +58,16 @@ jobs:
           --no-latest \
           --target ${{ matrix.addon }}
 
-    - name: Build and push ${{ matrix.addon }} ${{ matrix.arch }} image
-      uses: home-assistant/builder@master
-      if: github.event.pull_request.head.repo.full_name == github.repository
-      with:
-        args: |
-          --${{ matrix.arch }} \
-          --docker-hub $REGISTRY \
-          --image ${{ github.repository}}-${{ matrix.addon }}-{arch} \
-          --self-cache \
-          --version $GITHUB_REF_SLUG \
-          --no-latest \
-          --target ${{ matrix.addon }}
+    # Commented out: only test builds in PRs, don't push tagged images
+    # - name: Build and push ${{ matrix.addon }} ${{ matrix.arch }} image
+    #   uses: home-assistant/builder@master
+    #   if: github.event.pull_request.head.repo.full_name == github.repository
+    #   with:
+    #     args: |
+    #       --${{ matrix.arch }} \
+    #       --docker-hub $REGISTRY \
+    #       --image ${{ github.repository}}-${{ matrix.addon }}-{arch} \
+    #       --self-cache \
+    #       --version $GITHUB_REF_SLUG \
+    #       --no-latest \
+    #       --target ${{ matrix.addon }}
