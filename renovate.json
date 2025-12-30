@@ -17,6 +17,18 @@
       ],
       "depNameTemplate": "rhysd/actionlint",
       "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^rtl_433/Dockerfile$/",
+        "/^rtl_433_mqtt_autodiscovery/Dockerfile$/"
+      ],
+      "matchStrings": [
+        "ARG rtl433GitRevision=(?<currentValue>[0-9.]+)"
+      ],
+      "depNameTemplate": "merbanan/rtl_433",
+      "datasourceTemplate": "github-tags"
     }
   ]
 }
