@@ -7,7 +7,8 @@ on:
     branches:
       - next
     tags:
-      - 'v*'
+      - 'rtl_433-v*'
+      - 'rtl_433_mqtt_autodiscovery-v*'
   schedule:
     # A random daily time, as Actions doesn't have a suggestion for running
     # daily without causing job spikes.
