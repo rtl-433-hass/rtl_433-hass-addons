@@ -1,5 +1,3 @@
-# This is nearly identical to the builds on PRs, but doesn't specify
-# `--version` to builder so each addon gets it's own version.
 name: Create new rtl_433 addon release
 
 on:
@@ -11,92 +9,25 @@ on:
   schedule:
     # A random daily time, as Actions doesn't have a suggestion for running
     # daily without causing job spikes.
-    - cron:  '16 8 * * *'
-
-env:
-  REGISTRY: ghcr.io
+    - cron: '16 8 * * *'
 
 concurrency:
   group: ${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build_rtl_433:
-    name: Build rtl_433 addon
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      matrix:
-        arch: [amd64, aarch64]
-        addon: [rtl_433, rtl_433-next, rtl_433_mqtt_autodiscovery, rtl_433_mqtt_autodiscovery-next]
-        include:
-          - arch: amd64
-            runner: ubuntu-24.04
-            builder_image: amd64
-          - arch: aarch64
-            runner: ubuntu-24.04-arm
-            builder_image: aarch64
+  release:
+    name: Release Build
+    if: github.event_name != 'schedule'
+    uses: ./.github/workflows/build-addon.yml
+    with:
+      build-type: release
 
-    steps:
-    - name: Checkout the repository
-      if: github.event_name != 'schedule'
-      uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
-
-    - name: Checkout the next branch
-      if: github.event_name == 'schedule'
-      uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
-      with:
-        ref: next
-
-    - name: Make sure tag doesn't exist
-      if: github.event_name != 'schedule'
-      run: |
-        set -e
-        sudo apt-get update
-        sudo apt-get install -y jq
-        set -x
-        TAG=$(jq '.version' < rtl_433/config.json)
-        ! docker manifest inspect "ghcr.io/${{ github.repository}}-${{ matrix.addon }}-${{ matrix.arch }}:$TAG" > /dev/null
-
-    - name: Inject slug/short variables
-      uses: rlespinasse/github-slug-action@6f7a8d2348e2a4aa5defafcdaafe5aef3f83bd4b # v5
- 
-    - name: Login to Packages Container registry
-      uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Copy files for next if needed
-      run: |
-        if [ "${{ matrix.addon }}" == "rtl_433-next" ]; then
-          cp -nv -R rtl_433/* ${{ matrix.addon }}/
-        fi
-        if [ "${{ matrix.addon }}" == "rtl_433_mqtt_autodiscovery-next" ]; then
-          cp -nv -R rtl_433_mqtt_autodiscovery/* ${{ matrix.addon }}/
-        fi
-
-    - name: Build ${{ matrix.addon }} ${{ matrix.arch }} image
-      uses: home-assistant/builder@master
-      if: github.event.pull_request.head.repo.full_name != github.repository && github.event_name != 'schedule'
-      with:
-        image: ${{ matrix.builder_image }}
-        args: |
-          --${{ matrix.arch }} \
-          --docker-hub $REGISTRY \
-          --image ${{ github.repository}}-${{ matrix.addon }}-{arch} \
-          --no-latest \
-          --target ${{ matrix.addon }}
-
-    - name: Build nightly ${{ matrix.addon }} ${{ matrix.arch }} image
-      uses: home-assistant/builder@master
-      if: github.event.pull_request.head.repo.full_name != github.repository && github.event_name == 'schedule'
-      with:
-        image: ${{ matrix.builder_image }}
-        args: |
-          --${{ matrix.arch }} \
-          --docker-hub $REGISTRY \
-          --image ${{ github.repository}}-${{ matrix.addon }}-{arch} \
-          --no-latest \
-          --version next \
-          --target ${{ matrix.addon }}
+  nightly:
+    name: Nightly Build
+    if: github.event_name == 'schedule'
+    uses: ./.github/workflows/build-addon.yml
+    with:
+      build-type: nightly
+      checkout-ref: next
+      skip-tag-check: true
