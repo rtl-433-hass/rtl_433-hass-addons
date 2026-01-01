@@ -30,10 +30,10 @@ jobs:
         addon: [rtl_433, rtl_433-next, rtl_433_mqtt_autodiscovery, rtl_433_mqtt_autodiscovery-next]
         include:
           - arch: amd64
-            runner: ubuntu-22.04
+            runner: ubuntu-24.04
             builder_image: amd64
           - arch: aarch64
-            runner: ubuntu-22.04-arm
+            runner: ubuntu-24.04-arm
             builder_image: aarch64
 
     steps:
