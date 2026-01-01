@@ -44,6 +44,15 @@
       "depNameTemplate": "merbanan/rtl_433",
       "datasourceTemplate": "github-tags",
       "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github/workflows/release\\.yml$/"],
+      "matchStrings": [
+        "runner: ubuntu-(?<currentValue>[0-9]+\\.[0-9]+)(?:-arm)?\\n"
+      ],
+      "depNameTemplate": "ubuntu",
+      "datasourceTemplate": "github-runners"
     }
   ]
 }
