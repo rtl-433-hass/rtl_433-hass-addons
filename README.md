@@ -14,11 +14,19 @@ This is a collection of Home Assistant add-ons that work with [rtl_433](https://
 
 ## Release Process
 
-* The [next](https://github.com/pbkhrv/rtl_433-hass-addons/tree/next) branch represents the upcoming version of these addons.
-* [rtl_433/config.json](rtl_433/config.json) and [rtl_433_mqtt_autodiscovery/config.json](rtl_433_mqtt_autodiscovery/config.json) will contain the version numbers of the previously set addon versions, but will have different code.
-* When `next` is ready to be tagged for a release:
-  1. Create a pull request against `main`, bumping the versions of each `config.json` file if the individual addon has been changed. As well, update the `CHANGELOG.md` in the same pull request.
-  2. When the pull request has been approved, create a date-based tag such as `2022.12.01.0` on the last commit of the pull request. This will build docker containers with the version numbers in `config.json`.
-  3. Merge the PR into `main` to actually promote the release to end users. Note the new version(s) in the commit message.
-    - Note we do not tag `main` in git, since each addon has it's own version number.
-  4. Create a new branch off of `main` setting the addon versions back to `next`. Create a PR to merge `main` into `next` to reconcile the branches.
+All development happens on the `main` branch. The `-next` addons are built automatically on every push to `main`, while stable addons are only built when a release tag is created.
+
+### Automatic Builds
+
+| Event | What gets built | Version |
+|-------|-----------------|---------|
+| Push to `main` | `-next` addons only | `next` |
+| Daily schedule | `-next` addons only | `next` |
+| Tag push (`2025.01.15.0`) | Stable addons only | From `config.json` |
+
+### Creating a Release
+
+1. Create a pull request bumping the versions in [rtl_433/config.json](rtl_433/config.json) and/or [rtl_433_mqtt_autodiscovery/config.json](rtl_433_mqtt_autodiscovery/config.json). Update the corresponding `CHANGELOG.md` files.
+2. After the PR is merged, create a date-based tag (e.g., `2025.01.15.0`) on the merge commit. This triggers the stable addon builds.
+
+That's it! No branch reconciliation needed. Stable users see "Update Available" when the new version is published.
