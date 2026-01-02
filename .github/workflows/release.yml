@@ -25,6 +25,12 @@ jobs:
     name: Release Build
     if: github.ref_type == 'tag'
     uses: ./.github/workflows/build-addon.yml
+    # Permissions required by the reusable workflow
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
     with:
       build-type: release
 
@@ -33,6 +39,12 @@ jobs:
     name: Development Build
     if: github.ref_type != 'tag'
     uses: ./.github/workflows/build-addon.yml
+    # Permissions required by the reusable workflow
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
     with:
       build-type: nightly
       skip-tag-check: true
