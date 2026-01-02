@@ -1,9 +1,13 @@
+# Single-branch workflow:
+# - Push to main: Builds -next addons (development channel)
+# - Push tag (2*): Builds stable addons (production channel)
+# - Daily schedule: Builds -next addons with latest upstream rtl_433
 name: Create new rtl_433 addon release
 
 on:
   push:
     branches:
-      - next
+      - main
     tags:
       - '2*'
   schedule:
@@ -16,18 +20,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Build stable addons only when a tag is pushed
   release:
     name: Release Build
-    if: github.event_name != 'schedule'
+    if: github.ref_type == 'tag'
     uses: ./.github/workflows/build-addon.yml
     with:
       build-type: release
 
-  nightly:
-    name: Nightly Build
-    if: github.event_name == 'schedule'
+  # Build -next addons on push to main or daily schedule
+  development:
+    name: Development Build
+    if: github.ref_type != 'tag'
     uses: ./.github/workflows/build-addon.yml
     with:
       build-type: nightly
-      checkout-ref: next
       skip-tag-check: true

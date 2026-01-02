@@ -4,7 +4,11 @@ on:
   workflow_call:
     inputs:
       build-type:
-        description: 'Build type: test (no push), release (push with addon version), or nightly (push with next version)'
+        description: |
+          Build type determines what gets built and how:
+          - test: all addons, no push (for CI verification)
+          - release: stable addons only, push with version from config.json
+          - nightly: -next addons only, push with version "next"
         required: true
         type: string
       checkout-ref:
@@ -36,6 +40,13 @@ jobs:
           - arch: aarch64
             runner: ubuntu-24.04-arm
             builder_image: aarch64
+        exclude:
+          # release builds only stable addons
+          - addon: ${{ inputs.build-type == 'release' && 'rtl_433-next' || '' }}
+          - addon: ${{ inputs.build-type == 'release' && 'rtl_433_mqtt_autodiscovery-next' || '' }}
+          # nightly builds only -next addons
+          - addon: ${{ inputs.build-type == 'nightly' && 'rtl_433' || '' }}
+          - addon: ${{ inputs.build-type == 'nightly' && 'rtl_433_mqtt_autodiscovery' || '' }}
 
     steps:
     - name: Checkout the repository
