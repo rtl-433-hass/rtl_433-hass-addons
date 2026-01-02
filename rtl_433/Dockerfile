@@ -22,12 +22,12 @@ WORKDIR /build
 FROM builder as rtl_433_builder
 
 RUN git clone https://github.com/merbanan/rtl_433
-WORKDIR ./rtl_433
+WORKDIR /build/rtl_433
 
 # Build a specific commit or tag.
 ARG rtl433GitRevision=25.12
 RUN git checkout ${rtl433GitRevision}
-WORKDIR ./build
+WORKDIR /build/rtl_433/build
 RUN cmake ..
 RUN make -j 4
 
@@ -37,9 +37,9 @@ RUN make DESTDIR=/build/root/ install
 
 FROM builder as soapy_hackrf_builder
 RUN git clone https://github.com/pothosware/SoapyHackRF.git
-WORKDIR SoapyHackRF
+WORKDIR /build/SoapyHackRF
 RUN git checkout 6c0c33f0aa44c3080674e6bca0273184d3e9eb44
-WORKDIR build
+WORKDIR /build/SoapyHackRF/build
 RUN cmake ..
 RUN make -j4
 RUN make install
