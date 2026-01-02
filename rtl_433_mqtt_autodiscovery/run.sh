@@ -7,14 +7,14 @@ if [ -n "${MQTT_HOST+x}" ]; then
   RTL_TOPIC="${RTL_TOPIC:-rtl_433/+/events}"
   DISCOVERY_PREFIX="${DISCOVERY_PREFIX:-homeassistant}"
   DISCOVERY_INTERVAL="${DISCOVERY_INTERVAL:-600}"
-  OTHER_ARGS="${OTHER_ARGS-}"
+  OTHER_ARGS=()
 
   LOG_LEVEL="${LOG_LEVEL-}"
   if [[ $LOG_LEVEL == "quiet" ]]; then
-    OTHER_ARGS="${OTHER_ARGS} --quiet"
+    OTHER_ARGS+=(--quiet)
   fi
   if [[ $LOG_LEVEL == "debug" ]]; then
-    OTHER_ARGS="${OTHER_ARGS} --debug"
+    OTHER_ARGS+=(--debug)
   fi
 else
   if bashio::services.available mqtt; then
@@ -39,25 +39,25 @@ else
   DISCOVERY_PREFIX=$(bashio::config "discovery_prefix")
   DISCOVERY_INTERVAL=$(bashio::config "discovery_interval")
 
-  OTHER_ARGS=""
+  OTHER_ARGS=()
   if bashio::config.true "mqtt_retain"; then
-    OTHER_ARGS="${OTHER_ARGS} --retain"
+    OTHER_ARGS+=(--retain)
   fi
   if bashio::config.true "force_update"; then
-    OTHER_ARGS="${OTHER_ARGS} --force_update"
+    OTHER_ARGS+=(--force_update)
   fi
   # This is an optional parameter and we don't want to overwrite the defaults
   DEVICE_TOPIC_SUFFIX=$(bashio::config "device_topic_suffix")
   if [ -n "$DEVICE_TOPIC_SUFFIX" ]; then
-    OTHER_ARGS="${OTHER_ARGS} -T ${DEVICE_TOPIC_SUFFIX}"
+    OTHER_ARGS+=(-T "$DEVICE_TOPIC_SUFFIX")
   fi
 
   LOG_LEVEL=$(bashio::config "log_level")
   if [[ $LOG_LEVEL == "quiet" ]]; then
-    OTHER_ARGS="${OTHER_ARGS} --quiet"
+    OTHER_ARGS+=(--quiet)
   fi
   if [[ $LOG_LEVEL == "debug" ]]; then
-    OTHER_ARGS="${OTHER_ARGS} --debug"
+    OTHER_ARGS+=(--debug)
   fi
 fi
 
@@ -67,5 +67,4 @@ if [ -n "${MQTT_PORT+x}" ]; then
 fi
 
 echo "Starting rtl_433_mqtt_hass.py..."
-# shellcheck disable=SC2086
-python3 -u /rtl_433_mqtt_hass.py -H "$MQTT_HOST" -p "$MQTT_PORT" -R "$RTL_TOPIC" -D "$DISCOVERY_PREFIX" -i "$DISCOVERY_INTERVAL" $OTHER_ARGS
+python3 -u /rtl_433_mqtt_hass.py -H "$MQTT_HOST" -p "$MQTT_PORT" -R "$RTL_TOPIC" -D "$DISCOVERY_PREFIX" -i "$DISCOVERY_INTERVAL" "${OTHER_ARGS[@]}"
