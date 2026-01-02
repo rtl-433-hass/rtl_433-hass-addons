@@ -1,6 +1,7 @@
 #!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
 
-if [ ! -z ${MQTT_HOST+x} ]; then
+if [ -n "${MQTT_HOST+x}" ]; then
   echo "Running in stand-alone docker mode"
   MQTT_PORT="${MQTT_PORT:-1883}"
   RTL_TOPIC="${RTL_TOPIC:-rtl_433/+/events}"
@@ -20,14 +21,18 @@ else
     echo "mqtt found in this Home Assistance instance."
     MQTT_HOST=$(bashio::services mqtt "host")
     MQTT_PORT=$(bashio::services mqtt "port")
-    export MQTT_USERNAME=$(bashio::services mqtt "username")
-    export MQTT_PASSWORD=$(bashio::services mqtt "password")
+    MQTT_USERNAME=$(bashio::services mqtt "username")
+    export MQTT_USERNAME
+    MQTT_PASSWORD=$(bashio::services mqtt "password")
+    export MQTT_PASSWORD
   else
     echo "Using an external mqtt broker."
     MQTT_HOST=$(bashio::config "mqtt_host")
     MQTT_PORT=$(bashio::config "mqtt_port")
-    export MQTT_USERNAME=$(bashio::config "mqtt_user")
-    export MQTT_PASSWORD=$(bashio::config "mqtt_password")
+    MQTT_USERNAME=$(bashio::config "mqtt_user")
+    export MQTT_USERNAME
+    MQTT_PASSWORD=$(bashio::config "mqtt_password")
+    export MQTT_PASSWORD
   fi
 
   RTL_TOPIC=$(bashio::config "rtl_topic")
@@ -43,7 +48,7 @@ else
   fi
   # This is an optional parameter and we don't want to overwrite the defaults
   DEVICE_TOPIC_SUFFIX=$(bashio::config "device_topic_suffix")
-  if [ ! -z $DEVICE_TOPIC_SUFFIX ]; then
+  if [ -n "$DEVICE_TOPIC_SUFFIX" ]; then
     OTHER_ARGS="${OTHER_ARGS} -T ${DEVICE_TOPIC_SUFFIX}"
   fi
 
@@ -57,9 +62,10 @@ else
 fi
 
 # Set a default port for when the container is being run directly.
-if [ ! -z ${MQTT_PORT+x} ]; then
+if [ -n "${MQTT_PORT+x}" ]; then
   MQTT_PORT="1883"
 fi
 
 echo "Starting rtl_433_mqtt_hass.py..."
-python3 -u /rtl_433_mqtt_hass.py -H $MQTT_HOST -p $MQTT_PORT -R "$RTL_TOPIC" -D "$DISCOVERY_PREFIX" -i $DISCOVERY_INTERVAL $OTHER_ARGS
+# shellcheck disable=SC2086
+python3 -u /rtl_433_mqtt_hass.py -H "$MQTT_HOST" -p "$MQTT_PORT" -R "$RTL_TOPIC" -D "$DISCOVERY_PREFIX" -i "$DISCOVERY_INTERVAL" $OTHER_ARGS
