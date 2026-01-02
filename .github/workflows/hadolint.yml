@@ -1,0 +1,31 @@
+name: Lint Dockerfiles
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  hadolint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+      - name: Lint rtl_433 Dockerfile
+        id: lint-rtl_433
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
+        continue-on-error: true
+        with:
+          dockerfile: rtl_433/Dockerfile
+      - name: Lint rtl_433_mqtt_autodiscovery Dockerfile
+        id: lint-autodiscovery
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
+        continue-on-error: true
+        with:
+          dockerfile: rtl_433_mqtt_autodiscovery/Dockerfile
+      - name: Check lint results
+        if: steps.lint-rtl_433.outcome == 'failure' || steps.lint-autodiscovery.outcome == 'failure'
+        run: exit 1
