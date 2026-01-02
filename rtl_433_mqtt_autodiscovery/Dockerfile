@@ -4,13 +4,13 @@ FROM ${BUILD_FROM} as builder
 
 ARG rtl433GitRevision=25.12
 
-RUN wget https://raw.githubusercontent.com/merbanan/rtl_433/${rtl433GitRevision}/examples/rtl_433_mqtt_hass.py -O rtl_433_mqtt_hass.py
+RUN wget --progress=dot:giga https://raw.githubusercontent.com/merbanan/rtl_433/${rtl433GitRevision}/examples/rtl_433_mqtt_hass.py -O /rtl_433_mqtt_hass.py
 
 # hadolint ignore=DL3006
 FROM ${BUILD_FROM}
 
-COPY --from=builder rtl_433_mqtt_hass.py .
-COPY run.sh .
+COPY --from=builder /rtl_433_mqtt_hass.py /rtl_433_mqtt_hass.py
+COPY run.sh /run.sh
 
 RUN \
     pip install \
