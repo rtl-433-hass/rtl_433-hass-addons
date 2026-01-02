@@ -1,0 +1,19 @@
+name: Validate JSON files
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  json-lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+      - name: Validate JSON files
+        run: |
+          find . -name "*.json" -type f -not -path "./.claude/*" -exec jq empty {} \;

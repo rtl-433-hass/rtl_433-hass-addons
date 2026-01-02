@@ -1,11 +1,17 @@
 #!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
 
 conf_directory="/config/rtl_433"
 
 if bashio::services.available "mqtt"; then
+    # These variables are used in the heredoc template via ${host}, ${password}, etc.
+    # shellcheck disable=SC2034
     host=$(bashio::services "mqtt" "host")
+    # shellcheck disable=SC2034
     password=$(bashio::services "mqtt" "password")
+    # shellcheck disable=SC2034
     port=$(bashio::services "mqtt" "port")
+    # shellcheck disable=SC2034
     username=$(bashio::services "mqtt" "username")
     retain=$(bashio::config "retain")
     if [ "$retain" = "true" ] ; then
@@ -18,9 +24,9 @@ else
     bashio::log.info "For an external broker, manually update the output line in the configuration file with mqtt connection settings, and restart the addon."
 fi
 
-if [ ! -d $conf_directory ]
+if [ ! -d "$conf_directory" ]
 then
-    mkdir -p $conf_directory
+    mkdir -p "$conf_directory"
 fi
 
 # Check if the legacy configuration file is set and alert that it's deprecated.
@@ -37,9 +43,9 @@ then
 fi
 
 # Create a reasonable default configuration in /config/rtl_433.
-if [ ! "$(ls -A $conf_directory)" ]
+if [ ! "$(ls -A "$conf_directory")" ]
 then
-    cat > $conf_directory/rtl_433.conf.template <<EOD
+    cat > "$conf_directory"/rtl_433.conf.template <<EOD
 # This is an empty template for configuring rtl_433. mqtt information will be
 # automatically added. Create multiple files ending in '.conf.template' to
 # manage multiple rtl_433 radios, being sure to set the 'device' setting. The
@@ -97,33 +103,34 @@ EOD
 fi
 
 # Remove all rendered configuration files.
-rm -f $conf_directory/*.conf
+rm -f "$conf_directory"/*.conf
 
 rtl_433_pids=()
-for template in $conf_directory/*.conf.template
+for template in "$conf_directory"/*.conf.template
 do
     # Remove '.template' from the file name.
-    live=$(basename $template .template)
+    live=$(basename "$template" .template)
 
     # By sourcing the template, we can substitute any environment variable in
     # the template. In fact, enterprising users could write _any_ valid bash
     # to create the final configuration file. To simplify template creation,
     # we wrap the needed redirections into a temparary file.
-    echo "cat <<EOD > $live" > /tmp/rtl_433_heredoc
-    cat $template >> /tmp/rtl_433_heredoc
+    {
+        echo "cat <<EOD > $live"
+        cat "$template"
+        # Ensure a newline exists in case the template doesn't have one at the end
+        # of its file.
+        echo
+        echo EOD
+    } > /tmp/rtl_433_heredoc
 
-    # Ensure a newline exists in case the template doesn't have one at the end
-    # of its file.
-    echo >> /tmp/rtl_433_heredoc
-
-    echo EOD >> /tmp/rtl_433_heredoc
-
+    # shellcheck source=/dev/null
     source /tmp/rtl_433_heredoc
 
     echo "Starting rtl_433 with $live..."
-    tag=$(basename $live .conf)
+    tag=$(basename "$live" .conf)
     rtl_433 -c "$live" > >(sed -u "s/^/[$tag] /") 2> >(>&2 sed -u "s/^/[$tag] /")&
     rtl_433_pids+=($!)
 done
 
-wait -n ${rtl_433_pids[*]}
+wait -n "${rtl_433_pids[@]}"

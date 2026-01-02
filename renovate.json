@@ -9,6 +9,28 @@
     {
       "matchPackageNames": ["merbanan/rtl_433"],
       "semanticCommitType": "feat"
+    },
+    {
+      "matchDatasources": ["repology"],
+      "automerge": true
+    },
+    {
+      "groupName": "Docker",
+      "matchDatasources": ["repology"],
+      "automerge": true,
+      "matchPackageNames": ["/^alpine_.*/docker.*$/"]
+    },
+    {
+      "groupName": "OpenSSL",
+      "matchDatasources": ["repology"],
+      "automerge": true,
+      "matchPackageNames": ["/^alpine_.*/openssl.*$/"]
+    },
+    {
+      "groupName": "Python",
+      "matchDatasources": ["repology"],
+      "automerge": true,
+      "matchPackageNames": ["/^alpine_.*/python3(-dev)?$/"]
     }
   ],
   "customManagers": [
@@ -53,6 +75,17 @@
       ],
       "depNameTemplate": "ubuntu",
       "datasourceTemplate": "github-runners"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/Dockerfile$/"],
+      "matchStringsStrategy": "any",
+      "matchStrings": [
+        "\\s\\s(?<package>[a-z0-9][a-z0-9-_]+)=(?<currentValue>[a-z0-9-_.]+)\\s+"
+      ],
+      "versioningTemplate": "loose",
+      "datasourceTemplate": "repology",
+      "depNameTemplate": "alpine_3_21/{{package}}"
     }
   ]
 }
