@@ -96,6 +96,109 @@ Test Cases:
 - Use BATS framework for structured test execution
 - Create test fixtures for configuration scenarios
 
+#### 1.3 Code Coverage with kcov
+
+Use [kcov](https://github.com/SimonKagstrom/kcov) to measure shell script test coverage.
+
+**Why kcov**:
+- Native Linux tool, no Ruby dependency
+- Multiple output formats: lcov HTML, Cobertura XML, JSON
+- Direct integration with Codecov/Coveralls
+- Available in Alpine Linux (`apk add kcov`)
+- Works with BATS out of the box
+
+**Coverage Workflow**:
+
+```bash
+# Install kcov (Ubuntu/Debian)
+apt-get install kcov
+
+# Run BATS tests with coverage collection
+kcov --include-path=./rtl_433,./rtl_433_mqtt_autodiscovery \
+     --exclude-pattern=tests/ \
+     ./coverage \
+     bats tests/
+
+# Output structure:
+# ./coverage/
+# ├── index.html           # HTML report
+# ├── coverage.json        # JSON summary
+# ├── cobertura.xml        # Cobertura XML for CI tools
+# └── bats/                # Per-file coverage data
+```
+
+**GitHub Actions Integration**:
+
+```yaml
+# .github/workflows/unit-tests.yml
+name: Unit Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y kcov
+          # Install BATS
+          git clone https://github.com/bats-core/bats-core.git /tmp/bats
+          sudo /tmp/bats/install.sh /usr/local
+          # Install BATS helpers
+          git clone https://github.com/bats-core/bats-support.git tests/bats/bats-support
+          git clone https://github.com/bats-core/bats-assert.git tests/bats/bats-assert
+
+      - name: Run tests with coverage
+        run: |
+          kcov --include-path=./rtl_433,./rtl_433_mqtt_autodiscovery \
+               --exclude-pattern=tests/,bats-support,bats-assert \
+               ./coverage \
+               bats tests/
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          directory: ./coverage
+          files: ./coverage/cobertura.xml
+          fail_ci_if_error: false
+          verbose: true
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: ./coverage/
+          retention-days: 30
+```
+
+**Coverage Thresholds**:
+
+| File | Minimum Coverage |
+|------|------------------|
+| `rtl_433/run.sh` | 80% |
+| `rtl_433_mqtt_autodiscovery/run.sh` | 80% |
+| Overall | 75% |
+
+**Enforcing Coverage in CI**:
+
+```yaml
+- name: Check coverage threshold
+  run: |
+    COVERAGE=$(jq '.percent_covered' coverage/coverage.json)
+    if (( $(echo "$COVERAGE < 75" | bc -l) )); then
+      echo "Coverage $COVERAGE% is below threshold of 75%"
+      exit 1
+    fi
+    echo "Coverage: $COVERAGE%"
+```
+
 ---
 
 ### Layer 2: Container Build & Smoke Tests
@@ -317,34 +420,40 @@ Test Cases (Manual Execution):
    - Add BATS as a test dependency
    - Implement mock bashio functions
 
-2. **Add container smoke tests to CI**
+2. **Set up kcov for code coverage**
+   - Configure kcov to track run.sh coverage
+   - Integrate with Codecov for PR coverage reports
+   - Set initial coverage thresholds (start at 50%, increase to 80%)
+
+3. **Add container smoke tests to CI**
    - Verify binaries exist and are executable
    - Run `--help` commands to verify basic functionality
 
-3. **Add configuration schema validation**
+4. **Add configuration schema validation**
    - Use Python/jsonschema or similar
    - Run on every PR
 
 ### Phase 2: Integration Tests
 
-4. **Create docker-compose test environment**
+5. **Create docker-compose test environment**
    - Mosquitto MQTT broker
    - Mock rtl_433 event publisher
    - Autodiscovery addon under test
 
-5. **Implement MQTT integration tests with pytest**
+6. **Implement MQTT integration tests with pytest**
    - Test discovery payload generation
    - Test event processing logic
 
 ### Phase 3: Security & Polish
 
-6. **Add Trivy container scanning**
+7. **Add Trivy container scanning**
    - Run on release builds
    - Block on critical vulnerabilities
 
-7. **Add test coverage reporting**
-   - Track coverage over time
-   - Set minimum coverage thresholds
+8. **Enhance coverage reporting**
+   - Add coverage badges to README
+   - Configure coverage trend tracking in Codecov
+   - Set up PR comments with coverage diff
 
 ---
 
@@ -407,6 +516,10 @@ rtl_433-hass-addons/
 - bats-support (Test helpers)
 - bats-assert (Assertion library)
 
+# For code coverage
+- kcov (Bash/Python coverage tool)
+- jq (JSON parsing for coverage threshold checks)
+
 # For Python integration tests
 - pytest
 - pytest-docker
@@ -423,19 +536,22 @@ rtl_433-hass-addons/
 - actions/setup-python
 - docker/setup-buildx-action
 - aquasecurity/trivy-action
+- codecov/codecov-action@v4
 ```
 
 ---
 
 ## Success Metrics
 
-| Metric | Target |
-|--------|--------|
-| Shell script test coverage | >80% of run.sh lines |
-| Integration test coverage | All supported sensor types |
-| Build success rate | 100% on main branch |
-| Security scan pass rate | No critical/high CVEs |
-| CI pipeline duration | <15 minutes total |
+| Metric | Target | Measurement Tool |
+|--------|--------|------------------|
+| Shell script line coverage | ≥80% of run.sh lines | kcov + Codecov |
+| Shell script branch coverage | ≥70% of branches | kcov + Codecov |
+| Integration test coverage | All supported sensor types | pytest-cov |
+| Build success rate | 100% on main branch | GitHub Actions |
+| Security scan pass rate | No critical/high CVEs | Trivy |
+| CI pipeline duration | <15 minutes total | GitHub Actions |
+| Coverage trend | No regression on PRs | Codecov PR checks |
 
 ---
 
