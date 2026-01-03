@@ -29,6 +29,10 @@ Pre-commit hooks run automatically. Key linters:
 
 Run manually: `pre-commit run --all-files`
 
+## GitHub Actions
+
+When creating or modifying GitHub Actions workflows, always check the repository for existing references to external actions. Use the same action references (including the commit hash and version comment) that are already in use. This ensures consistency and avoids introducing different versions of the same action.
+
 ## Structure
 
 Each add-on has its own directory:
