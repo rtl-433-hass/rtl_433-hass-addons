@@ -33,6 +33,22 @@ if ! command -v docker &> /dev/null; then
   fi
 fi
 
+# Start Docker daemon if not running
+if command -v docker &> /dev/null && ! docker info &> /dev/null 2>&1; then
+  echo "Starting Docker daemon..."
+  if command -v dockerd &> /dev/null; then
+    dockerd &> /dev/null &
+    # Wait for daemon to be ready
+    for _ in {1..10}; do
+      if docker info &> /dev/null 2>&1; then
+        echo "Docker daemon started successfully"
+        break
+      fi
+      sleep 1
+    done
+  fi
+fi
+
 # Install pre-commit hooks if .pre-commit-config.yaml exists
 if [ -f "$CLAUDE_PROJECT_DIR/.pre-commit-config.yaml" ]; then
   echo "Installing pre-commit hooks..."
