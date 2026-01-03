@@ -50,6 +50,22 @@ if ! command -v shellcheck &> /dev/null; then
   fi
 fi
 
+# Install bats if not available (for running shell script tests)
+if ! command -v bats &> /dev/null; then
+  echo "Installing bats..."
+  if command -v apt-get &> /dev/null; then
+    apt-get install -y bats
+  else
+    echo "Warning: Could not install bats - no supported package manager found"
+  fi
+fi
+
+# Initialize git submodules (for BATS test helpers)
+if [ -f "$CLAUDE_PROJECT_DIR/.gitmodules" ]; then
+  echo "Initializing git submodules..."
+  git -C "$CLAUDE_PROJECT_DIR" submodule update --init --recursive
+fi
+
 # Install actionlint if not available
 if ! command -v actionlint &> /dev/null; then
   echo "Installing actionlint..."
@@ -64,4 +80,5 @@ echo "Available tools:"
 command -v pre-commit && echo "  - pre-commit: $(pre-commit --version)"
 command -v docker && echo "  - docker: $(docker --version)"
 command -v shellcheck && echo "  - shellcheck: $(shellcheck --version | head -2 | tail -1)"
+command -v bats && echo "  - bats: $(bats --version)"
 command -v actionlint && echo "  - actionlint: $(actionlint --version)"
