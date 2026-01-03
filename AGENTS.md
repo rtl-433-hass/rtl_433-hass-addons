@@ -37,13 +37,6 @@ Each add-on has its own directory:
 
 The `-next` variants are development versions built from `main`.
 
-## Release Process
-
-1. Bump version in `config.json`
-2. Update `CHANGELOG.md`
-3. Merge to `main`
-4. Tag with date format: `YYYY.MM.DD.N` (e.g., `2025.01.15.0`)
-
 ## Testing
 
 Before committing:
