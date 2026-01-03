@@ -8,8 +8,14 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 - `feat:` new features
 - `fix:` bug fixes
 - `docs:` documentation
+- `style:` formatting, whitespace
+- `refactor:` code restructuring
+- `perf:` performance improvements
+- `test:` adding/updating tests
+- `build:` build system changes
 - `ci:` CI/workflow changes
 - `chore:` maintenance (deps, etc.)
+- `revert:` reverting changes
 
 ## Linting
 
