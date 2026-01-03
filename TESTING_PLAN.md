@@ -103,9 +103,8 @@ Use [kcov](https://github.com/SimonKagstrom/kcov) to measure shell script test c
 **Why kcov**:
 - Native Linux tool, no Ruby dependency
 - Multiple output formats: lcov HTML, Cobertura XML, JSON
-- Direct integration with Codecov/Coveralls
-- Available in Alpine Linux (`apk add kcov`)
 - Works with BATS out of the box
+- Available in Alpine Linux (`apk add kcov`)
 
 **Coverage Workflow**:
 
@@ -140,9 +139,9 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
 
       - name: Install dependencies
         run: |
@@ -162,20 +161,10 @@ jobs:
                ./coverage \
                bats tests/
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+      - name: Generate coverage report
+        uses: ggilder/codecoverage@47c83daaf1d5a3190cad56363baf459c59114170 # v1
         with:
-          directory: ./coverage
-          files: ./coverage/cobertura.xml
-          fail_ci_if_error: false
-          verbose: true
-
-      - name: Upload coverage artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: ./coverage/
-          retention-days: 30
+          coverage-file: ./coverage/cobertura.xml
 ```
 
 **Coverage Thresholds**:
@@ -422,7 +411,7 @@ Test Cases (Manual Execution):
 
 2. **Set up kcov for code coverage**
    - Configure kcov to track run.sh coverage
-   - Integrate with Codecov for PR coverage reports
+   - Integrate coverage reporting into CI with ggilder/codecoverage action
    - Set initial coverage thresholds (start at 50%, increase to 80%)
 
 3. **Add container smoke tests to CI**
@@ -452,7 +441,7 @@ Test Cases (Manual Execution):
 
 8. **Enhance coverage reporting**
    - Add coverage badges to README
-   - Configure coverage trend tracking in Codecov
+   - Configure coverage trend tracking
    - Set up PR comments with coverage diff
 
 ---
@@ -532,11 +521,10 @@ rtl_433-hass-addons/
 ### CI Dependencies
 
 ```yaml
-# GitHub Actions
-- actions/setup-python
-- docker/setup-buildx-action
-- aquasecurity/trivy-action
-- codecov/codecov-action@v4
+# GitHub Actions (use pinned versions matching existing workflows)
+- actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+- ggilder/codecoverage@47c83daaf1d5a3190cad56363baf459c59114170 # v1
+- aquasecurity/trivy-action (for security scanning)
 ```
 
 ---
@@ -545,13 +533,13 @@ rtl_433-hass-addons/
 
 | Metric | Target | Measurement Tool |
 |--------|--------|------------------|
-| Shell script line coverage | ≥80% of run.sh lines | kcov + Codecov |
-| Shell script branch coverage | ≥70% of branches | kcov + Codecov |
+| Shell script line coverage | ≥80% of run.sh lines | kcov |
+| Shell script branch coverage | ≥70% of branches | kcov |
 | Integration test coverage | All supported sensor types | pytest-cov |
 | Build success rate | 100% on main branch | GitHub Actions |
 | Security scan pass rate | No critical/high CVEs | Trivy |
 | CI pipeline duration | <15 minutes total | GitHub Actions |
-| Coverage trend | No regression on PRs | Codecov PR checks |
+| Coverage trend | No regression on PRs | ggilder/codecoverage |
 
 ---
 
