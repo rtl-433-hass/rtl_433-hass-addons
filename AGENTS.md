@@ -39,7 +39,4 @@ The `-next` variants are development versions built from `main`.
 
 ## Testing
 
-Before committing:
-- Verify JSON syntax in config files
-- Run `shellcheck` on shell scripts
-- Run `hadolint` on Dockerfiles
+Rely on pre-commit hooks to run all checks automatically.
