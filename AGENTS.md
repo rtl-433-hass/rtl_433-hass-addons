@@ -17,6 +17,8 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 - `chore:` maintenance (deps, etc.)
 - `revert:` reverting changes
 
+Create unique commits for each step in a process, as long as pre-commit hooks pass. Structure commits so the reviewer has the option of squashing the commits or rebasing and merging them all.
+
 ## Linting
 
 Pre-commit hooks run automatically. Key linters:
