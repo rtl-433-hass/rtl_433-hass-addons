@@ -39,6 +39,10 @@ Each add-on has its own directory:
 
 The `-next` variants are development versions built from `main`.
 
+## Pull Requests
+
+The pull request title should always be the value of the first commit in the branch.
+
 ## Testing
 
 Rely on pre-commit hooks to run all checks automatically.
