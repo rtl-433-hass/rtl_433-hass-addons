@@ -4,6 +4,7 @@
 
 # Get the directory where this script is located
 BATS_TEST_DIRNAME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC2034  # REPO_ROOT is available for use in test files
 REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
 
 # Load bats-support and bats-assert from git submodules
