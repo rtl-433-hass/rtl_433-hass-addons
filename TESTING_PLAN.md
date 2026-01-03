@@ -142,29 +142,25 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        with:
+          submodules: recursive  # BATS is installed as git submodules
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y kcov
-          # Install BATS
-          git clone https://github.com/bats-core/bats-core.git /tmp/bats
-          sudo /tmp/bats/install.sh /usr/local
-          # Install BATS helpers
-          git clone https://github.com/bats-core/bats-support.git tests/bats/bats-support
-          git clone https://github.com/bats-core/bats-assert.git tests/bats/bats-assert
+          sudo apt-get install -y bats kcov
 
       - name: Run tests with coverage
         run: |
           kcov --include-path=./rtl_433,./rtl_433_mqtt_autodiscovery \
-               --exclude-pattern=tests/,bats-support,bats-assert \
+               --exclude-pattern=tests/,bats-support,bats-assert,bats-core \
                ./coverage \
                bats tests/
 
       - name: Generate coverage report
         uses: ggilder/codecoverage@47c83daaf1d5a3190cad56363baf459c59114170 # v1
         with:
-          coverage-file: ./coverage/cobertura.xml
+          coverage-file: ./coverage/bats/cobertura.xml
 ```
 
 **Coverage Thresholds**:
