@@ -1,0 +1,46 @@
+---
+name: Unit Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats kcov
+
+      - name: Run tests with coverage
+        run: |
+          kcov --include-path=./rtl_433,./rtl_433_mqtt_autodiscovery \
+               --exclude-pattern=tests/,bats-support,bats-assert,bats-core \
+               ./coverage \
+               bats tests/
+
+      - name: Check coverage threshold
+        run: |
+          if [ -f coverage/bats/coverage.json ]; then
+            COVERAGE=$(jq -r '.percent_covered // "0"' coverage/bats/coverage.json)
+            echo "Coverage: $COVERAGE%"
+            if (( $(echo "$COVERAGE < 50" | bc -l) )); then
+              echo "Warning: Coverage $COVERAGE% is below threshold of 50%"
+            fi
+          else
+            echo "Coverage file not found, skipping threshold check"
+          fi
+
+      - name: Generate coverage report
+        uses: ggilder/codecoverage@47c83daaf1d5a3190cad56363baf459c59114170 # v1
+        with:
+          coverage-file: ./coverage/bats/cobertura.xml
+        continue-on-error: true
