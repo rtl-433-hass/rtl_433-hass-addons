@@ -29,6 +29,12 @@ jobs:
   build:
     name: Build ${{ matrix.addon }} (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
+    # Sets the permissions granted to the `GITHUB_TOKEN` for the actions in this job.
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
     strategy:
       matrix:
         arch: [amd64, aarch64]
@@ -74,6 +80,35 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Determine image version
+      id: version
+      run: |
+        if [ "${{ inputs.build-type }}" == "release" ]; then
+          # For release builds, get version from config.json
+          # Use the base addon directory (without -next suffix)
+          BASE_ADDON="${{ matrix.addon }}"
+          BASE_ADDON="${BASE_ADDON%-next}"
+          VERSION=$(jq -r '.version' < "${BASE_ADDON}/config.json")
+        elif [ "${{ inputs.build-type }}" == "nightly" ]; then
+          VERSION="next"
+        else
+          VERSION="${{ env.GITHUB_REF_SLUG }}"
+        fi
+        IMAGE_NAME="${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.addon }}-${{ matrix.arch }}"
+        {
+          echo "version=${VERSION}"
+          echo "image_name=${IMAGE_NAME}"
+          echo "full_image=${IMAGE_NAME}:${VERSION}"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Extract metadata (tags, labels) for Docker
+      id: meta
+      uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+      with:
+        images: ${{ steps.version.outputs.image_name }}
+        tags: |
+          type=raw,value=${{ steps.version.outputs.version }}
+
     - name: Copy files for next addon variants
       run: |
         if [ "${{ matrix.addon }}" == "rtl_433-next" ]; then
@@ -84,6 +119,7 @@ jobs:
         fi
 
     - name: Build addon image
+      id: build
       uses: home-assistant/builder@master
       with:
         image: ${{ matrix.builder_image }}
@@ -96,3 +132,22 @@ jobs:
           ${{ inputs.build-type == 'test' && '--test --self-cache --version' || '' }} \
           ${{ inputs.build-type == 'test' && env.GITHUB_REF_SLUG || '' }} \
           ${{ inputs.build-type == 'nightly' && '--version next' || '' }}
+
+    - name: Get image digest
+      id: digest
+      if: inputs.build-type != 'test'
+      run: |
+        DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "${{ steps.version.outputs.full_image }}" | cut -d'@' -f2)
+        echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+        echo "Image digest: ${DIGEST}"
+
+    # This step generates an artifact attestation for the image, which is an unforgeable
+    # statement about where and how it was built. It increases supply chain security for
+    # people who consume the image.
+    - name: Generate artifact attestation
+      if: inputs.build-type != 'test'
+      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+      with:
+        subject-name: ${{ steps.version.outputs.image_name }}
+        subject-digest: ${{ steps.digest.outputs.digest }}
+        push-to-registry: true

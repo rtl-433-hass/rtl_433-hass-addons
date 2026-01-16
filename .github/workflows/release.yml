@@ -1,6 +1,6 @@
 # Single-branch workflow:
 # - Push to main: Builds -next addons (development channel)
-# - Push tag (2*): Builds stable addons (production channel)
+# - Push tag: Builds stable addons (production channel)
 # - Daily schedule: Builds -next addons with latest upstream rtl_433
 name: Create new rtl_433 addon release
 
@@ -9,7 +9,8 @@ on:
     branches:
       - main
     tags:
-      - '2*'
+      - 'rtl_433-v*'
+      - 'rtl_433_mqtt_autodiscovery-v*'
   schedule:
     # A random daily time, as Actions doesn't have a suggestion for running
     # daily without causing job spikes.
@@ -25,6 +26,12 @@ jobs:
     name: Release Build
     if: github.ref_type == 'tag'
     uses: ./.github/workflows/build-addon.yml
+    # Permissions required by the reusable workflow
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
     with:
       build-type: release
 
@@ -33,6 +40,12 @@ jobs:
     name: Development Build
     if: github.ref_type != 'tag'
     uses: ./.github/workflows/build-addon.yml
+    # Permissions required by the reusable workflow
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
     with:
       build-type: nightly
       skip-tag-check: true
