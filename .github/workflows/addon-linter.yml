@@ -1,0 +1,31 @@
+name: Lint Home Assistant Add-ons
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  addon-linter:
+    name: Lint ${{ matrix.addon }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        addon:
+          - rtl_433
+          - rtl_433-next
+          - rtl_433_mqtt_autodiscovery
+          - rtl_433_mqtt_autodiscovery-next
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+
+      - name: Run Add-on Linter
+        uses: frenck/action-addon-linter@f995494fd84fae6310d23617e66d0e37de4f14eb # v2.21.0
+        with:
+          path: "./${{ matrix.addon }}"

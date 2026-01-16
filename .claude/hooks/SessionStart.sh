@@ -22,6 +22,17 @@ if ! command -v pre-commit &> /dev/null; then
   fi
 fi
 
+# Install Docker if not available (required for shellcheck pre-commit hook)
+if ! command -v docker &> /dev/null; then
+  echo "Installing Docker..."
+  if command -v apt-get &> /dev/null; then
+    apt-get update
+    apt-get install -y docker.io
+  else
+    echo "Warning: Could not install Docker - no supported package manager found"
+  fi
+fi
+
 # Install pre-commit hooks if .pre-commit-config.yaml exists
 if [ -f "$CLAUDE_PROJECT_DIR/.pre-commit-config.yaml" ]; then
   echo "Installing pre-commit hooks..."
@@ -51,5 +62,6 @@ fi
 echo "Development environment setup complete!"
 echo "Available tools:"
 command -v pre-commit && echo "  - pre-commit: $(pre-commit --version)"
+command -v docker && echo "  - docker: $(docker --version)"
 command -v shellcheck && echo "  - shellcheck: $(shellcheck --version | head -2 | tail -1)"
 command -v actionlint && echo "  - actionlint: $(actionlint --version)"
