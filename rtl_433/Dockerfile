@@ -13,7 +13,7 @@ RUN apk add --no-cache --virtual .buildDeps \
     librtlsdr-dev=2.0.2-r0 \
     soapy-sdr=0.8.1-r3 \
     soapy-sdr-dev=0.8.1-r3 \
-    openssl-dev=3.3.5-r0 \
+    openssl-dev=3.3.6-r0 \
     cmake=3.31.1-r0 \
     git=2.47.3-r0
 
