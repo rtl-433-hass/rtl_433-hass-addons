@@ -74,7 +74,7 @@ jobs:
       uses: rlespinasse/github-slug-action@6f7a8d2348e2a4aa5defafcdaafe5aef3f83bd4b # v5
 
     - name: Login to Packages Container registry
-      uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+      uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
