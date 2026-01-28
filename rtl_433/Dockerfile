@@ -1,4 +1,4 @@
-ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.21
+ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.23
 # hadolint ignore=DL3006
 FROM $BUILD_FROM as builder
 
