@@ -112,10 +112,10 @@ The following options apply to all broker configurations:
 Follow these steps to run just the autodiscovery script in a dedicated container. For this setup, we recommend using the [hertzg/rtl_433_docker](https://github.com/hertzg/rtl_433_docker) images to run `rtl_433` itself.
 
 ```
-docker run -e MQTT_HOST=mqtt.example.com -e MQTT_USERNAME=username -e MQTT_PASSWORD=password ghcr.io/pbkhrv/rtl_433-hass-addons-rtl_433_mqtt_autodiscovery-amd64
+docker run -e MQTT_HOST=mqtt.example.com -e MQTT_USERNAME=username -e MQTT_PASSWORD=password ghcr.io/rtl-433-hass/rtl_433_mqtt_autodiscovery
 ```
 
-Replace `amd64` with your appropriate architecture. For Raspberry Pi, this is `armhf`, `armv7`, or `aarch64` depending on your Pi version and operating system. If unsure, running `arch` at the command line can help identify the architecture.
+The image is a multi-arch manifest, so Docker automatically pulls the variant matching your machine's architecture.
 
 Using docker-compose:
 
@@ -124,7 +124,7 @@ version: '3'
 services:
   rtl_433_autodiscovery:
     container_name: rtl_433_autodiscovery
-    image: ghcr.io/pbkhrv/rtl_433-hass-addons-rtl_433_mqtt_autodiscovery-amd64 # On Raspberry Pi replace `amd64` with the appropriate architecture.
+    image: ghcr.io/rtl-433-hass/rtl_433_mqtt_autodiscovery # multi-arch manifest; Docker selects the right architecture automatically.
     environment:
       - MQTT_HOST=mqtt.example.com
       - MQTT_USERNAME=username
