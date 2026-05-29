@@ -24,35 +24,56 @@ on:
 
 env:
   REGISTRY: ghcr.io
+  REGISTRY_PREFIX: ghcr.io/${{ github.repository_owner }}
+  ARCHITECTURES: '["amd64", "aarch64"]'
 
 jobs:
+  # Determine which addons to build based on the build type. The output is a
+  # JSON array consumed by the build and manifest job matrices.
+  setup:
+    name: Determine addons
+    runs-on: ubuntu-latest
+    outputs:
+      addons: ${{ steps.addons.outputs.addons }}
+    steps:
+      - name: Select addons for build type
+        id: addons
+        env:
+          BUILD_TYPE: ${{ inputs.build-type }}
+        run: |
+          case "${BUILD_TYPE}" in
+            release) addons='["rtl_433", "rtl_433_mqtt_autodiscovery"]' ;;
+            nightly) addons='["rtl_433-next", "rtl_433_mqtt_autodiscovery-next"]' ;;
+            test)    addons='["rtl_433", "rtl_433-next", "rtl_433_mqtt_autodiscovery", "rtl_433_mqtt_autodiscovery-next"]' ;;
+            *)
+              echo "::error::Unknown build-type: ${BUILD_TYPE}"
+              exit 1
+              ;;
+          esac
+          echo "addons=${addons}" >> "$GITHUB_OUTPUT"
+
+  # Build one single-arch image per (addon, arch). aarch64 builds run on native
+  # ARM runners (no QEMU emulation). Images are pushed and signed with Cosign
+  # for every build type except "test".
   build:
     name: Build ${{ matrix.addon }} (${{ matrix.arch }})
-    runs-on: ${{ matrix.runner }}
+    needs: setup
+    runs-on: ${{ matrix.os }}
     # Sets the permissions granted to the `GITHUB_TOKEN` for the actions in this job.
     permissions:
       contents: read
-      packages: write
-      attestations: write
-      id-token: write
+      packages: write # push images to GitHub Container Registry
+      id-token: write # Cosign keyless signing (issue OIDC token)
     strategy:
+      fail-fast: false
       matrix:
+        addon: ${{ fromJSON(needs.setup.outputs.addons) }}
         arch: [amd64, aarch64]
-        addon: [rtl_433, rtl_433-next, rtl_433_mqtt_autodiscovery, rtl_433_mqtt_autodiscovery-next]
         include:
           - arch: amd64
-            runner: ubuntu-24.04
-            builder_image: amd64
+            os: ubuntu-24.04
           - arch: aarch64
-            runner: ubuntu-24.04-arm
-            builder_image: aarch64
-        exclude:
-          # release builds only stable addons
-          - addon: ${{ inputs.build-type == 'release' && 'rtl_433-next' || '' }}
-          - addon: ${{ inputs.build-type == 'release' && 'rtl_433_mqtt_autodiscovery-next' || '' }}
-          # nightly builds only -next addons
-          - addon: ${{ inputs.build-type == 'nightly' && 'rtl_433' || '' }}
-          - addon: ${{ inputs.build-type == 'nightly' && 'rtl_433_mqtt_autodiscovery' || '' }}
+            os: ubuntu-24.04-arm
 
     steps:
     - name: Checkout the repository
@@ -60,94 +81,115 @@ jobs:
       with:
         ref: ${{ inputs.checkout-ref || github.ref }}
 
-    - name: Make sure tag doesn't exist
-      if: inputs.build-type == 'release' && !inputs.skip-tag-check
-      run: |
-        set -e
-        sudo apt-get update
-        sudo apt-get install -y jq
-        set -x
-        TAG=$(jq '.version' < rtl_433/config.json)
-        ! docker manifest inspect "ghcr.io/${{ github.repository}}-${{ matrix.addon }}-${{ matrix.arch }}:$TAG" > /dev/null
-
     - name: Inject slug/short variables
       uses: rlespinasse/github-slug-action@e6f261660910b273384c5c42b17a0217881b217a # v5
 
-    - name: Login to Packages Container registry
-      uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Copy shared files into -next variants
+      env:
+        ADDON: ${{ matrix.addon }}
+      run: |
+        case "${ADDON}" in
+          rtl_433-next)
+            cp -nv -R rtl_433/* "${ADDON}/" ;;
+          rtl_433_mqtt_autodiscovery-next)
+            cp -nv -R rtl_433_mqtt_autodiscovery/* "${ADDON}/" ;;
+        esac
 
     - name: Determine image version
       id: version
+      env:
+        BUILD_TYPE: ${{ inputs.build-type }}
+        ADDON: ${{ matrix.addon }}
       run: |
-        if [ "${{ inputs.build-type }}" == "release" ]; then
-          # For release builds, get version from config.json
-          # Use the base addon directory (without -next suffix)
-          BASE_ADDON="${{ matrix.addon }}"
-          BASE_ADDON="${BASE_ADDON%-next}"
-          VERSION=$(jq -r '.version' < "${BASE_ADDON}/config.json")
-        elif [ "${{ inputs.build-type }}" == "nightly" ]; then
-          VERSION="next"
-        else
-          VERSION="${{ env.GITHUB_REF_SLUG }}"
-        fi
-        IMAGE_NAME="${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.addon }}-${{ matrix.arch }}"
+        case "${BUILD_TYPE}" in
+          release) version=$(jq -r '.version' "${ADDON}/config.json") ;;
+          nightly) version="next" ;;
+          *)       version="${GITHUB_REF_SLUG}" ;;
+        esac
+        echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+    - name: Make sure tag doesn't exist
+      if: inputs.build-type == 'release' && !inputs.skip-tag-check
+      env:
+        IMAGE: ${{ env.REGISTRY_PREFIX }}/${{ matrix.addon }}
+        TAG: ${{ steps.version.outputs.version }}
+      run: |
+        ! docker manifest inspect "${IMAGE}:${TAG}" > /dev/null
+
+    - name: Read addon build configuration
+      id: buildconf
+      env:
+        ADDON: ${{ matrix.addon }}
+        ARCH: ${{ matrix.arch }}
+      run: |
+        # The legacy home-assistant/builder action read build.json implicitly.
+        # build-image only injects BUILD_ARCH/BUILD_VERSION, so pass BUILD_FROM
+        # and any extra build args (e.g. rtl433GitRevision) from build.json here.
+        build_from=$(jq -r --arg arch "${ARCH}" '.build_from[$arch]' "${ADDON}/build.json")
         {
-          echo "version=${VERSION}"
-          echo "image_name=${IMAGE_NAME}"
-          echo "full_image=${IMAGE_NAME}:${VERSION}"
+          echo "build_args<<EOF"
+          echo "BUILD_FROM=${build_from}"
+          jq -r '.args // {} | to_entries[] | "\(.key)=\(.value)"' "${ADDON}/build.json"
+          echo "EOF"
         } >> "$GITHUB_OUTPUT"
-
-    - name: Extract metadata (tags, labels) for Docker
-      id: meta
-      uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6
-      with:
-        images: ${{ steps.version.outputs.image_name }}
-        tags: |
-          type=raw,value=${{ steps.version.outputs.version }}
-
-    - name: Copy files for next addon variants
-      run: |
-        if [ "${{ matrix.addon }}" == "rtl_433-next" ]; then
-          cp -nv -R rtl_433/* ${{ matrix.addon }}/
-        fi
-        if [ "${{ matrix.addon }}" == "rtl_433_mqtt_autodiscovery-next" ]; then
-          cp -nv -R rtl_433_mqtt_autodiscovery/* ${{ matrix.addon }}/
-        fi
 
     - name: Build addon image
       id: build
-      uses: home-assistant/builder@master
+      uses: home-assistant/builder/actions/build-image@62a1597b84b3461abad9816d9cd92862a2b542c3 # 2026.03.2
       with:
-        image: ${{ matrix.builder_image }}
-        args: |
-          --${{ matrix.arch }} \
-          --docker-hub $REGISTRY \
-          --image ${{ github.repository}}-${{ matrix.addon }}-{arch} \
-          --no-latest \
-          --target ${{ matrix.addon }} \
-          ${{ inputs.build-type == 'test' && '--test --self-cache --version' || '' }} \
-          ${{ inputs.build-type == 'test' && env.GITHUB_REF_SLUG || '' }} \
-          ${{ inputs.build-type == 'nightly' && '--version next' || '' }}
+        arch: ${{ matrix.arch }}
+        image: ${{ env.REGISTRY_PREFIX }}/${{ matrix.arch }}-${{ matrix.addon }}
+        image-tags: ${{ steps.version.outputs.version }}
+        version: ${{ steps.version.outputs.version }}
+        context: ${{ matrix.addon }}
+        build-args: ${{ steps.buildconf.outputs.build_args }}
+        container-registry: ${{ env.REGISTRY }}
+        container-registry-password: ${{ secrets.GITHUB_TOKEN }}
+        push: ${{ inputs.build-type != 'test' }}
+        cosign: ${{ inputs.build-type != 'test' }}
+        cache-gha-scope: ${{ matrix.addon }}
+        cache-image-tag: ${{ steps.version.outputs.version }}
 
-    - name: Get image digest
-      id: digest
-      if: inputs.build-type != 'test'
+  # Combine the per-arch images into a single multi-arch manifest per addon and
+  # sign it with Cosign. Skipped for "test" builds, which never push images.
+  manifest:
+    name: Publish ${{ matrix.addon }} manifest
+    needs: [setup, build]
+    if: inputs.build-type != 'test'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # checkout to read config.json versions
+      packages: write # push the manifest to GitHub Container Registry
+      id-token: write # Cosign keyless signing (issue OIDC token)
+    strategy:
+      fail-fast: false
+      matrix:
+        addon: ${{ fromJSON(needs.setup.outputs.addons) }}
+
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      with:
+        ref: ${{ inputs.checkout-ref || github.ref }}
+
+    - name: Determine image version
+      id: version
+      env:
+        BUILD_TYPE: ${{ inputs.build-type }}
+        ADDON: ${{ matrix.addon }}
       run: |
-        DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "${{ steps.version.outputs.full_image }}" | cut -d'@' -f2)
-        echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
-        echo "Image digest: ${DIGEST}"
+        case "${BUILD_TYPE}" in
+          release) version=$(jq -r '.version' "${ADDON}/config.json") ;;
+          *)       version="next" ;;
+        esac
+        echo "version=${version}" >> "$GITHUB_OUTPUT"
 
-    # This step generates an artifact attestation for the image, which is an unforgeable
-    # statement about where and how it was built. It increases supply chain security for
-    # people who consume the image.
-    - name: Generate artifact attestation
-      if: inputs.build-type != 'test'
-      uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4
+    - name: Publish multi-arch manifest
+      uses: home-assistant/builder/actions/publish-multi-arch-manifest@62a1597b84b3461abad9816d9cd92862a2b542c3 # 2026.03.2
       with:
-        subject-name: ${{ steps.version.outputs.image_name }}
-        subject-digest: ${{ steps.digest.outputs.digest }}
-        push-to-registry: true
+        architectures: ${{ env.ARCHITECTURES }}
+        registry-prefix: ${{ env.REGISTRY_PREFIX }}
+        container-registry: ${{ env.REGISTRY }}
+        container-registry-password: ${{ secrets.GITHUB_TOKEN }}
+        image-name: ${{ matrix.addon }}
+        image-tags: ${{ steps.version.outputs.version }}
