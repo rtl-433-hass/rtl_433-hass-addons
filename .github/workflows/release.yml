@@ -29,7 +29,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
       id-token: write
     with:
       build-type: release
@@ -43,7 +42,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
       id-token: write
     with:
       build-type: nightly
