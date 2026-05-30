@@ -210,10 +210,10 @@ No circular dependencies.
 **Parallel Tasks:**
 - ✔️ Task 003: Publish each radio to the Supervisor discovery API (depends on: 001, 002)
 
-### Phase 3: Tests and documentation
+### ✅ Phase 3: Tests and documentation
 **Parallel Tasks:**
-- Task 004: Update test suite for HTTP/port/discovery behaviour (depends on: 002, 003)
-- Task 005: Update documentation for HTTP output and discovery (depends on: 002, 003)
+- ✔️ Task 004: Update test suite for HTTP/port/discovery behaviour (depends on: 002, 003)
+- ✔️ Task 005: Update documentation for HTTP output and discovery (depends on: 002, 003)
 
 ### Post-phase Actions
 Run `pre-commit run --all-files` after each phase that changes tracked files; never advance a phase until its validation gate passes.

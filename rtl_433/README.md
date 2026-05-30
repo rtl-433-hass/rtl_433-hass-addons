@@ -2,21 +2,19 @@
 
 ## About
 
-This add-on is a simple wrapper around the excellent [rtl_433](https://github.com/merbanan/rtl_433) project that receives wireless sensor data via [one of the supported SDR dongles](https://triq.org/rtl_433/HARDWARE.html), decodes and outputs it in a variety of formats including JSON and MQTT. The wireless sensors rtl_433 understands transmit data mostly on 433.92 MHz, 868 MHz, 315 MHz, 345 MHz, and 915 MHz ISM bands.
+This add-on is a simple wrapper around the excellent [rtl_433](https://github.com/merbanan/rtl_433) project that receives wireless sensor data via [one of the supported SDR dongles](https://triq.org/rtl_433/HARDWARE.html), decodes and outputs it in a variety of formats. The wireless sensors rtl_433 understands transmit data mostly on 433.92 MHz, 868 MHz, 315 MHz, 345 MHz, and 915 MHz ISM bands.
 
 [View the rtl_433 documentation](https://triq.org/rtl_433)
 
 ## How it works
 
-The only thing this add-on does is run rtl_433 under the Home Assistant OS supervisor. All you have to do is supply a config file.
+This add-on runs rtl_433 under the Home Assistant OS supervisor. All you have to do is supply a config file.
 
-By default, rtl_433 prints the data it receives to the terminal - it is up to you to configure it to publish the data to MQTT so that Home Assistant can access it, which can be done with one line in the config file.
+Each radio runs its own rtl_433 process, and each process exposes rtl_433's built-in HTTP/WebSocket server with an `output http://0.0.0.0:<port>` line in its config. The add-on assigns each radio a stable TCP port starting at `8433` (the second radio gets `8434`, and so on, up to a maximum of 10 radios). Ports are assigned deterministically by sorting the templates by their `device` value, so a given radio keeps the same port across restarts.
 
-Once you get the rtl_433 sensor data into MQTT, you'll need to help Home Assistant discover and make sense of it. You can do that in a number of ways:
+The [rtl_433 integration for Home Assistant](https://github.com/rtl-433-hass/rtl_433) is the consumer of this data: it connects to each radio over `ws://<addon-host>:<port>/ws` and discovers and configures your devices automatically.
 
-  * manually configure `sensors` and `binary_sensors` in HA and [link them to the appropriate MQTT topics](https://www.home-assistant.io/integrations/sensor.mqtt/) coming out of rtl_433,
-  * run the [rtl_433_mqtt_hass.py](https://github.com/merbanan/rtl_433/tree/master/examples/rtl_433_mqtt_hass.py) script manually or on a schedule to do most of the configuration automatically, or
-  * install the dedicated [rtl_433 integration for Home Assistant](https://github.com/rtl-433-hass/rtl_433), which discovers and configures your devices automatically.
+The add-on also publishes each radio to Home Assistant's Supervisor discovery API (best-effort). Full automatic setup depends on the rtl_433 integration adding Supervisor discovery support, which it does not have yet. Until then, add the integration manually in **Settings -> Devices & Services -> rtl_433**, supplying the add-on host and the radio's port.
 
 ## Prerequisites
 
@@ -44,19 +42,19 @@ Once you get the rtl_433 sensor data into MQTT, you'll need to help Home Assista
 
 ## Configuration
 
-For a "zero configuration" setup, install the [Mosquitto broker](https://github.com/home-assistant/addons/blob/master/mosquitto/DOCS.md) addon. While other brokers may work, they are not tested and will require manual setup. Once the addon is installed, start or restart the rtl_433 add-on to start capturing known 433 MHz protocols, and install the dedicated [rtl_433 integration](https://github.com/rtl-433-hass/rtl_433) so Home Assistant can discover your devices.
+For a "zero configuration" setup, just start the add-on with the default config and install the dedicated [rtl_433 integration](https://github.com/rtl-433-hass/rtl_433). The default configuration captures known 433 MHz protocols and exposes them over rtl_433's HTTP/WebSocket server, which the integration consumes.
 
 For more advanced configuration, take a look at the example config file included in the rtl_433 source code: [rtl_433.example.conf](https://github.com/merbanan/rtl_433/blob/master/conf/rtl_433.example.conf)
 
 Note that since the configuration file has bash variables in it, **dollar signs and other special shell characters need to be escaped**. For example, to use the literal string `$GPRMC` in the configuration file, use `\$GPRMC`.
 
-The `retain` option controls if MQTT's `retain` flag is enabled or disabled by default. It can be overridden on a per-radio basis by setting `retain` to `true` or `false` in the `output` setting.
-
-When configuring manually, assuming that you intend to get the rtl_433 data into Home Assistant, the absolute minimum that you need to specify in the config file is the [MQTT connection and authentication information](https://triq.org/rtl_433/OPERATION.html#mqtt-output):
+When configuring manually, assuming that you intend to get the rtl_433 data into Home Assistant, the absolute minimum that you need to specify in the config file is the [HTTP output](https://triq.org/rtl_433/OPERATION.html#http-server). The add-on fills in the radio's assigned port via the `${port}` placeholder, so use:
 
 ```
-output      mqtt://HOST:PORT,user=XXXX,pass=YYYYYYY
+output      http://0.0.0.0:${port}
 ```
+
+This makes rtl_433 expose its decoded events over an HTTP/WebSocket server on the port the add-on assigned to this radio (the first radio gets `8433`, the next `8434`, and so on). The Home Assistant rtl_433 integration then connects to `ws://<addon-host>:<port>/ws` to receive the data.
 
 rtl_433 defaults to listening on 433.92MHz, but even if that's what you need, it's probably a good idea to specify the frequency explicitly to avoid confusion:
 
@@ -70,7 +68,7 @@ You might also want to narrow down the list of protocols that rtl_433 should try
 protocol    40
 ```
 
-Last but not least, if you decide to use the MQTT auto discovery script or integration, its documentation recommends converting units in all of the data coming out of rtl_433 into SI:
+Last but not least, the rtl_433 integration's documentation recommends converting units in all of the data coming out of rtl_433 into SI:
 
 ```
 convert     si
@@ -79,7 +77,7 @@ convert     si
 Assuming you have only one USB dongle attached and rtl_433 is able to automatically find it, we arrive at a minimal rtl_433 config file that looks like this:
 
 ```
-output      mqtt://HOST:PORT,user=XXXX,pass=YYYYYYY
+output      http://0.0.0.0:${port}
 
 frequency   433.92M
 protocol    40
