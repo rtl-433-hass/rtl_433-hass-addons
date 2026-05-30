@@ -120,7 +120,7 @@ jobs:
 
     - name: Build addon image
       id: build
-      uses: home-assistant/builder@master
+      uses: home-assistant/builder@e7e707d90bba1e9ec2f128b2d1848994228667dd # master
       with:
         image: ${{ matrix.builder_image }}
         args: |
