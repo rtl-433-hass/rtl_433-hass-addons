@@ -5,17 +5,21 @@ FROM $BUILD_FROM as builder
 ENV LANG C.UTF-8
 
 # Copied with minor edits from https://github.com/hertzg/rtl_433_docker/blob/master/images/alpine/build-context/Dockerfile
+# DL3018 (pin apk versions) is ignored on purpose: Alpine removes superseded
+# package versions from its repos, so exact pins break the build as soon as a
+# patch ships upstream.
+# hadolint ignore=DL3018
 RUN apk add --no-cache --virtual .buildDeps \
-    build-base=0.5-r3 \
-    libusb-dev=1.0.27-r0 \
-    hackrf=2024.02.1-r0 \
-    hackrf-dev=2024.02.1-r0 \
-    librtlsdr-dev=2.0.2-r0 \
-    soapy-sdr=0.8.1-r3 \
-    soapy-sdr-dev=0.8.1-r3 \
-    openssl-dev=3.3.6-r0 \
-    cmake=3.31.1-r0 \
-    git=2.47.3-r0
+    build-base \
+    libusb-dev \
+    hackrf \
+    hackrf-dev \
+    librtlsdr-dev \
+    soapy-sdr \
+    soapy-sdr-dev \
+    openssl-dev \
+    cmake \
+    git
 
 WORKDIR /build
 
@@ -56,12 +60,16 @@ FROM $BUILD_FROM
 
 ENV LANG C.UTF-8
 
+# DL3018 (pin apk versions) is ignored on purpose: Alpine removes superseded
+# package versions from its repos, so exact pins break the build as soon as a
+# patch ships upstream.
+# hadolint ignore=DL3018
 RUN apk add --no-cache \
-    libusb=1.0.27-r0 \
-    hackrf=2024.02.1-r0 \
-    librtlsdr=2.0.2-r0 \
-    soapy-sdr=0.8.1-r3 \
-    sed=4.9-r2
+    libusb \
+    hackrf \
+    librtlsdr \
+    soapy-sdr \
+    sed
 WORKDIR /root
 COPY --from=rtl_433_builder /build/root/ /
 
