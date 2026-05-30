@@ -1,6 +1,6 @@
 ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.21
 # hadolint ignore=DL3006
-FROM ${BUILD_FROM} as builder
+FROM ${BUILD_FROM} AS builder
 
 ARG rtl433GitRevision=25.12
 
