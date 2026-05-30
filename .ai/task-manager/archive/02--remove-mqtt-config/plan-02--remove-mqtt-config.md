@@ -221,3 +221,27 @@ Run `pre-commit run --all-files` after each phase that changes tracked files; ne
 ### Execution Summary
 - Total Phases: 3
 - Total Tasks: 5
+
+## Execution Summary
+
+**Status**: ✅ Completed Successfully
+**Completed Date**: 2026-05-30
+
+### Results
+All five tasks across three phases completed and committed on branch `feat/remove-mqtt-config`:
+
+- **Phase 1** — Removed MQTT from `rtl_433/run.sh` and both `config.json` files; rewrote the entrypoint to generate an HTTP default template, sort templates by `device`, and assign stable ports (8433–8442, max 10 radios). Added `hassio_api`, the `rtl_433` discovery service, and the exposed port range to both add-ons.
+- **Phase 2** — Added a best-effort `publish_discovery()` step that POSTs one message per radio to `http://supervisor/discovery` (`{"service":"rtl_433","config":{host,port,"path":"/ws","secure":false}}`), deriving the host from the Supervisor-assigned add-on hostname and skipping gracefully without a token.
+- **Phase 3** — Replaced MQTT tests with coverage of the HTTP default template, device-sorted stable port assignment, the 10-radio cap, and the discovery payload (11/11 bats tests passing); removed the obsolete `tests/rtl_433_mqtt_autodiscovery` suite; updated both READMEs and CHANGELOGs for the HTTP migration with BREAKING notes.
+
+Validation gates passed at every phase: `check-json` (valid JSON), `shellcheck` (clean), and the bats suite (11/11). Self-validation confirmed no functional MQTT/`retain`/`rtl_433_conf_file` references remain and both `config.json` surfaces are correct.
+
+### Noteworthy Events
+- **`pre-commit`/`shellcheck` were not installed** in the execution environment. A static `shellcheck` v0.10.0 binary was fetched to run the lint gate, and the bats submodules were initialized so the test suite could run. `check-json`, `shellcheck`, and bats were all run manually and pass; hadolint/actionlint targets were untouched by this work.
+- **Integration discovery dependency**: The HA `rtl-433-hass/rtl_433` integration has no `async_step_hassio`/`hassio` discovery support yet, so the published discovery messages are best-effort until that integration adds support. The add-on side is built to the standard Supervisor discovery contract. Documented in the READMEs and changelog with a manual-setup fallback.
+- **Out-of-scope pre-existing issue**: `tests/config/validate_configs.py` lists `rtl_433_mqtt_autodiscovery*` add-on directories that do not exist in this repo and checks for an `{arch}` image placeholder the real configs do not use. These mismatches pre-date this work, the script is not wired into pre-commit, and addressing them belongs to the separate active plan `01--remove-autodiscovery-addon`.
+- **Cleanup**: Removed an unused `radio_devices` parallel array flagged during post-execution review to avoid dead state.
+
+### Necessary follow-ups
+- Add Supervisor (`hassio`) discovery support to the `rtl-433-hass/rtl_433` integration (separate repo) so the published discovery messages auto-start its config flow.
+- Reconcile `tests/config/validate_configs.py` with the actual add-on set (via plan `01--remove-autodiscovery-addon`).
