@@ -9,8 +9,6 @@ from pathlib import Path
 ADDONS = [
     "rtl_433",
     "rtl_433-next",
-    "rtl_433_mqtt_autodiscovery",
-    "rtl_433_mqtt_autodiscovery-next",
 ]
 
 # Required fields in config.json
@@ -77,13 +75,12 @@ def validate_config_json(addon_path: Path, addon_name: str) -> list[str]:
                     "(expected semver or 'next')"
                 )
 
-    # Check image naming convention
+    # Check image naming convention. The addons publish a single multi-arch
+    # manifest per image, so the name has no '{arch}' placeholder.
     if "image" in config:
         image = config["image"]
         if not image.startswith("ghcr.io/"):
             errors.append(f"{addon_name}: Image should use ghcr.io registry: {image}")
-        if "{arch}" not in image:
-            errors.append(f"{addon_name}: Image should contain '{{arch}}' placeholder: {image}")
 
     # Check schema matches options
     if "options" in config and "schema" in config:
@@ -230,7 +227,6 @@ def main() -> int:
     print("\nValidating consistency between stable and next versions...")
     addon_pairs = [
         ("rtl_433", "rtl_433-next"),
-        ("rtl_433_mqtt_autodiscovery", "rtl_433_mqtt_autodiscovery-next"),
     ]
     consistency_errors = validate_consistency(addon_pairs)
     if consistency_errors:

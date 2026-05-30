@@ -22,7 +22,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          kcov --include-path=./rtl_433,./rtl_433_mqtt_autodiscovery \
+          kcov --include-path=./rtl_433 \
                --exclude-pattern=tests/,bats-support,bats-assert,bats-core \
                ./coverage \
                bats tests/

@@ -2,11 +2,9 @@
 
 ## Executive Summary
 
-This document proposes a comprehensive testing strategy for the four add-ons in this repository:
+This document proposes a comprehensive testing strategy for the add-ons in this repository:
 - `rtl_433` (stable SDR reader)
 - `rtl_433-next` (development SDR reader)
-- `rtl_433_mqtt_autodiscovery` (stable Home Assistant discovery)
-- `rtl_433_mqtt_autodiscovery-next` (development discovery)
 
 ## Current State
 
@@ -21,7 +19,6 @@ This document proposes a comprehensive testing strategy for the four add-ons in 
 - Integration with MQTT
 - Configuration template processing
 - Multi-radio scenarios
-- Auto-discovery accuracy
 - Container security scanning
 - MQTT payload validation
 
@@ -63,40 +60,12 @@ Test Cases:
     └── Contains correct MQTT output line format
 ```
 
-#### 1.2 rtl_433_mqtt_autodiscovery/run.sh Tests
-
-Create `rtl_433_mqtt_autodiscovery/tests/test_run.sh`:
-
-```
-Test Cases:
-├── Standalone Docker Mode
-│   ├── Uses MQTT_HOST environment variable when set
-│   ├── Applies default port 1883
-│   ├── Applies default RTL_TOPIC rtl_433/+/events
-│   ├── Applies default DISCOVERY_PREFIX homeassistant
-│   └── Applies default DISCOVERY_INTERVAL 600
-│
-├── Log Level Handling
-│   ├── Adds --quiet flag for quiet log level
-│   ├── Adds --debug flag for debug log level
-│   └── No extra flags for default log level
-│
-├── Optional Parameters
-│   ├── Adds --retain when mqtt_retain is true
-│   ├── Adds --force_update when force_update is true
-│   ├── Adds -T suffix when device_topic_suffix is set
-│   └── Omits optional flags when not configured
-│
-└── Command Construction
-    └── Builds correct python3 command with all arguments
-```
-
 **Implementation Approach**:
 - Mock `bashio::` functions to simulate Home Assistant environment
 - Use BATS framework for structured test execution
 - Create test fixtures for configuration scenarios
 
-#### 1.3 Code Coverage with kcov
+#### 1.2 Code Coverage with kcov
 
 Use [kcov](https://github.com/SimonKagstrom/kcov) to measure shell script test coverage.
 
@@ -113,7 +82,7 @@ Use [kcov](https://github.com/SimonKagstrom/kcov) to measure shell script test c
 apt-get install kcov
 
 # Run BATS tests with coverage collection
-kcov --include-path=./rtl_433,./rtl_433_mqtt_autodiscovery \
+kcov --include-path=./rtl_433 \
      --exclude-pattern=tests/ \
      ./coverage \
      bats tests/
@@ -152,7 +121,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          kcov --include-path=./rtl_433,./rtl_433_mqtt_autodiscovery \
+          kcov --include-path=./rtl_433 \
                --exclude-pattern=tests/,bats-support,bats-assert,bats-core \
                ./coverage \
                bats tests/
@@ -168,7 +137,6 @@ jobs:
 | File | Minimum Coverage |
 |------|------------------|
 | `rtl_433/run.sh` | 80% |
-| `rtl_433_mqtt_autodiscovery/run.sh` | 80% |
 | Overall | 75% |
 
 **Enforcing Coverage in CI**:
@@ -203,8 +171,7 @@ Test Cases:
 │
 ├── Required Binaries Present
 │   ├── rtl_433 binary exists and is executable
-│   ├── Required SDR libraries are installed (librtlsdr, soapysdr)
-│   └── Python + paho-mqtt installed (autodiscovery addon)
+│   └── Required SDR libraries are installed (librtlsdr, soapysdr)
 │
 ├── File Permissions
 │   ├── run.sh is executable
@@ -221,16 +188,11 @@ Create `.github/workflows/smoke-tests.yml`:
 
 ```yaml
 Test Cases:
-├── rtl_433 Container
-│   ├── Container starts without crash (no hardware mode)
-│   ├── Shows help output: `rtl_433 --help`
-│   ├── Lists supported protocols: `rtl_433 -R help`
-│   └── Exits gracefully when no SDR device found (expected behavior)
-│
-└── rtl_433_mqtt_autodiscovery Container
-    ├── Container starts without crash
-    ├── Python script is valid: `python3 -m py_compile /rtl_433_mqtt_hass.py`
-    └── Shows help output when run with --help
+└── rtl_433 Container
+    ├── Container starts without crash (no hardware mode)
+    ├── Shows help output: `rtl_433 --help`
+    ├── Lists supported protocols: `rtl_433 -R help`
+    └── Exits gracefully when no SDR device found (expected behavior)
 ```
 
 ---
@@ -247,39 +209,28 @@ Create `tests/integration/` directory:
 tests/integration/
 ├── docker-compose.test.yml    # Test environment with Mosquitto
 ├── conftest.py                # pytest fixtures
-├── test_mqtt_autodiscovery.py # Python integration tests
 ├── test_rtl433_mqtt_output.py # MQTT output format tests
 └── fixtures/
-    ├── sample_events.json     # Real rtl_433 event samples
-    └── expected_discovery.json # Expected HA discovery payloads
+    └── sample_events.json     # Real rtl_433 event samples
 ```
 
-#### 3.2 MQTT Autodiscovery Integration Tests
+#### 3.2 rtl_433 MQTT Output Integration Tests
 
 ```python
 Test Cases:
-├── Device Discovery
-│   ├── Publishes discovery config for temperature sensor
-│   ├── Publishes discovery config for humidity sensor
-│   ├── Publishes discovery config for battery status
-│   ├── Creates unique device identifiers
-│   └── Uses correct MQTT topics (homeassistant/sensor/...)
-│
-├── Event Processing
-│   ├── Parses rtl_433 JSON event correctly
-│   ├── Handles missing optional fields gracefully
-│   ├── Processes events from multiple devices
-│   └── Respects discovery_interval setting
-│
-├── MQTT Connection
-│   ├── Connects with username/password authentication
-│   ├── Reconnects on connection loss
+├── MQTT Publishing
+│   ├── Publishes events to the configured MQTT topic
+│   ├── Uses correct topic structure (rtl_433/<id>/events)
 │   └── Publishes with retain flag when configured
 │
-└── Topic Configuration
-    ├── Subscribes to configured rtl_topic pattern
-    ├── Publishes to configured discovery_prefix
-    └── Applies device_topic_suffix correctly
+├── Event Processing
+│   ├── Emits valid JSON for each decoded event
+│   ├── Handles missing optional fields gracefully
+│   └── Processes events from multiple devices
+│
+└── MQTT Connection
+    ├── Connects with username/password authentication
+    └── Reconnects on connection loss
 ```
 
 #### 3.3 Mock Sensor Event Fixtures
@@ -361,7 +312,6 @@ Tools:
 │   └── Detect secrets in image layers
 │
 ├── Grype - Dependency vulnerability scanning
-│   ├── Scan Python dependencies (paho-mqtt)
 │   └── Scan Alpine packages
 │
 └── Hadolint - Already implemented
@@ -422,11 +372,10 @@ Test Cases (Manual Execution):
 
 5. **Create docker-compose test environment**
    - Mosquitto MQTT broker
-   - Mock rtl_433 event publisher
-   - Autodiscovery addon under test
+   - rtl_433 addon under test
 
 6. **Implement MQTT integration tests with pytest**
-   - Test discovery payload generation
+   - Test rtl_433 MQTT output format
    - Test event processing logic
 
 ### Phase 3: Security & Polish
@@ -473,18 +422,13 @@ rtl_433-hass-addons/
 │   ├── integration/
 │   │   ├── docker-compose.test.yml
 │   │   ├── conftest.py
-│   │   ├── test_autodiscovery.py
+│   │   ├── test_rtl433_mqtt_output.py
 │   │   └── fixtures/
-│   │       ├── sample_events.json
-│   │       └── expected_discovery.json
+│   │       └── sample_events.json
 │   └── config/
 │       └── test_config_schema.py
 │
-├── rtl_433/
-│   └── tests/
-│       └── test_run.bats        # Unit tests for run.sh
-│
-└── rtl_433_mqtt_autodiscovery/
+└── rtl_433/
     └── tests/
         └── test_run.bats        # Unit tests for run.sh
 ```
@@ -508,7 +452,7 @@ rtl_433-hass-addons/
 # For Python integration tests
 - pytest
 - pytest-docker
-- paho-mqtt (already used by addon)
+- paho-mqtt (MQTT client for asserting addon output)
 
 # For security scanning
 - trivy (container scanning)
