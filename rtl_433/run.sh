@@ -113,10 +113,6 @@ mapfile -t sorted_templates < <(printf '%s\n' "${templates_by_device[@]}" | sort
 # Parallel arrays describing each launched radio. These are populated during port
 # assignment/launch and consumed by the Supervisor discovery step below, which
 # iterates them to publish one Home Assistant discovery message per radio.
-# radio_devices is populated for symmetry/diagnostics but is not part of the
-# discovery payload (the integration keys on host/port), so it is not read.
-# shellcheck disable=SC2034  # populated but intentionally not consumed yet
-radio_devices=()
 radio_ports=()
 radio_tags=()
 
@@ -144,7 +140,6 @@ do
     live=$(basename "$template" .template)
     tag=$(basename "$live" .conf)
 
-    radio_devices+=("$device")
     radio_ports+=("$port")
     radio_tags+=("$tag")
 
