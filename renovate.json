@@ -34,10 +34,7 @@
     },
     {
       "customType": "regex",
-      "managerFilePatterns": [
-        "/^rtl_433/Dockerfile$/",
-        "/^rtl_433_mqtt_autodiscovery/Dockerfile$/"
-      ],
+      "managerFilePatterns": ["/^rtl_433/Dockerfile$/"],
       "matchStrings": [
         "ARG rtl433GitRevision=(?<currentValue>[0-9.]+)"
       ],
