@@ -5,10 +5,17 @@
   "slug": "rtl433",
   "description": "Receive wireless sensor data via an SDR dongle and rtl_433",
   "url": "https://github.com/rtl-433-hass/rtl_433-hass-addons/tree/main/rtl_433",
-  "arch": ["aarch64", "amd64"],
+  "arch": [
+    "aarch64",
+    "amd64"
+  ],
   "init": false,
-  "map": ["homeassistant_config:rw"],
-  "services": ["mqtt:want"],
+  "map": [
+    "homeassistant_config:rw"
+  ],
+  "services": [
+    "mqtt:want"
+  ],
   "usb": true,
   "udev": true,
   "options": {

@@ -3,6 +3,28 @@
 * Update Alpine base to 3.21
 * Update the stable addon to rtl_433 25.02
 
+## [0.1.0](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.0.1...v0.1.0) (2026-05-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* remove rtl_433_mqtt_autodiscovery add-on
+
+### Features
+
+* **deps:** update dependency merbanan/rtl_433 to v25.12 ([#16](https://github.com/rtl-433-hass/rtl_433-hass-addons/issues/16)) ([5d82cb3](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/5d82cb321add25e05aa72300ee2cb32cc5b8655f))
+* remove rtl_433_mqtt_autodiscovery add-on ([148a238](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/148a238558f7dc8db1b67f5c2b30378d9aae8254))
+
+
+### Bug Fixes
+
+* address remaining hadolint warnings ([6496e69](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/6496e697d7f9cf5e0ffae2c73da93dad69e11b99))
+* **config:** resolve addon linter errors and warnings ([98711d5](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/98711d5bf210a097605a830cd3a797cf90b54484))
+* **rtl_433:** pin apk package versions (DL3018) ([001daca](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/001daca7ccd9668f2db35d4768f24ea58550070f))
+* **rtl_433:** remove deprecated MAINTAINER instruction ([cf68a5d](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/cf68a5d58ce4437c0b2e811d02656012fe57f20a))
+* **rtl_433:** use absolute WORKDIR paths (DL3000) ([bb28e85](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/bb28e8574914fc9744aca2c502b6636d90f58739))
+* use inline hadolint ignores for DL3006 ([ed762d5](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/ed762d522ba7de480686ff899aa0dbafef40071a))
+
 ## [0.5.3] - 2024-10-20
 
 * Support SoapySDR devices #198 #199
