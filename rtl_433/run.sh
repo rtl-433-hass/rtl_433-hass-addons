@@ -111,13 +111,13 @@ done
 mapfile -t sorted_templates < <(printf '%s\n' "${templates_by_device[@]}" | sort)
 
 # Parallel arrays describing each launched radio. These are populated during port
-# assignment/launch and are the integration point for a later discovery task,
-# which iterates them to publish Home Assistant discovery.
-# shellcheck disable=SC2034  # consumed by the discovery step (see task 3)
+# assignment/launch and consumed by the Supervisor discovery step below, which
+# iterates them to publish one Home Assistant discovery message per radio.
+# radio_devices is populated for symmetry/diagnostics but is not part of the
+# discovery payload (the integration keys on host/port), so it is not read.
+# shellcheck disable=SC2034  # populated but intentionally not consumed yet
 radio_devices=()
-# shellcheck disable=SC2034  # consumed by the discovery step (see task 3)
 radio_ports=()
-# shellcheck disable=SC2034  # consumed by the discovery step (see task 3)
 radio_tags=()
 
 rtl_433_pids=()
@@ -172,5 +172,82 @@ do
 
     index=$((index + 1))
 done
+
+# ---------------------------------------------------------------------------
+# Publish each radio to the Home Assistant Supervisor discovery API.
+#
+# This runs after the radios are launched (so a radio that failed to start is
+# not advertised) but before the blocking 'wait' below. Every step here is
+# best-effort: a failure to publish must never stop the radios from running.
+# ---------------------------------------------------------------------------
+publish_discovery() {
+    # The Supervisor token is injected into the add-on environment when
+    # 'hassio_api: true' is set in config.json. Without it we cannot reach the
+    # Supervisor API (e.g. local/test runs), so log and skip gracefully.
+    if [ -z "${SUPERVISOR_TOKEN:-}" ]
+    then
+        bashio::log.info "SUPERVISOR_TOKEN not set; skipping Supervisor discovery publication."
+        return 0
+    fi
+
+    # Determine the host Home Assistant should connect to. We use the add-on's
+    # Supervisor-assigned hostname rather than a hard-coded IP so the value
+    # stays correct across restarts and networks. bashio::addon.hostname wraps
+    # the Supervisor '/addons/self/info' endpoint; if that helper is missing or
+    # returns nothing we fall back to querying the endpoint directly.
+    local host=""
+    if bashio::var.has_value "$(bashio::addon.hostname 2>/dev/null)"
+    then
+        host="$(bashio::addon.hostname)"
+    else
+        host="$(curl -s -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+            "http://supervisor/addons/self/info" \
+            | sed -n 's/.*"hostname"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+    fi
+
+    if [ -z "$host" ]
+    then
+        bashio::log.warning "Could not determine the add-on hostname; skipping Supervisor discovery publication."
+        return 0
+    fi
+
+    local i port tag body http_code
+    for i in "${!radio_ports[@]}"
+    do
+        port="${radio_ports[$i]}"
+        tag="${radio_tags[$i]}"
+
+        # Build the discovery payload with printf (jq is not in the runtime
+        # image). 'service' MUST equal the discovery entry in config.json
+        # ("rtl_433"). The integration connects to ws://<host>:<port>/ws.
+        # host/port are interpolated; the static keys/values are literal, so no
+        # untrusted data is embedded that would need JSON escaping.
+        printf -v body \
+            '{"service": "rtl_433", "config": {"host": "%s", "port": %s, "path": "/ws", "secure": false}}' \
+            "$host" "$port"
+
+        # Best-effort POST. Capture the HTTP status separately from the body so
+        # a non-2xx response or a curl failure is logged but never aborts the
+        # script. -o /dev/null discards the response body.
+        http_code="$(curl -s -o /dev/null -w '%{http_code}' \
+            -X POST \
+            -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$body" \
+            "http://supervisor/discovery" 2>/dev/null)" || http_code="000"
+
+        if [[ "$http_code" =~ ^2 ]]
+        then
+            bashio::log.info "Published discovery for radio '${tag}' on port ${port} (HTTP ${http_code})."
+        else
+            # The Supervisor may reject the 'rtl_433' service until the
+            # integration registers discovery support. This is expected and
+            # non-fatal; the radios keep running regardless.
+            bashio::log.warning "Discovery publication for radio '${tag}' on port ${port} returned HTTP ${http_code} (non-fatal; Supervisor may reject the service until the integration supports discovery)."
+        fi
+    done
+}
+
+publish_discovery
 
 wait -n "${rtl_433_pids[@]}"

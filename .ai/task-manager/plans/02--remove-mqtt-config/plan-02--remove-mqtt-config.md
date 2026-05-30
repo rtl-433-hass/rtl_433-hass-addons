@@ -206,9 +206,9 @@ No circular dependencies.
 - ✔️ Task 001: Update add-on config.json metadata for HTTP + discovery
 - ✔️ Task 002: Rewrite run.sh — HTTP output with stable per-radio ports
 
-### Phase 2: Discovery publication
+### ✅ Phase 2: Discovery publication
 **Parallel Tasks:**
-- Task 003: Publish each radio to the Supervisor discovery API (depends on: 001, 002)
+- ✔️ Task 003: Publish each radio to the Supervisor discovery API (depends on: 001, 002)
 
 ### Phase 3: Tests and documentation
 **Parallel Tasks:**
