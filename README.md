@@ -16,17 +16,20 @@ This is a collection of Home Assistant add-ons that work with [rtl_433](https://
 
 All development happens on the `main` branch. The `-next` addons are built automatically on every push to `main`, while stable addons are only built when a release tag is created.
 
+Releases are automated with [release-please](https://github.com/googleapis/release-please), driven by [Conventional Commits](https://www.conventionalcommits.org/). Version numbers and `CHANGELOG.md` are derived from commit messages — there is no manual version bump.
+
 ### Automatic Builds
 
 | Event | What gets built | Version |
 |-------|-----------------|---------|
 | Push to `main` | `-next` addons only | `next` |
 | Daily schedule | `-next` addons only | `next` |
-| Tag push (`2025.01.15.0`) | Stable addons only | From `config.json` |
+| Tag push (`v*`) | Stable addons only | From `config.json` |
 
 ### Creating a Release
 
-1. Create a pull request bumping the version in [rtl_433/config.json](rtl_433/config.json). Update the corresponding `CHANGELOG.md` file.
-2. After the PR is merged, create a date-based tag (e.g., `2025.01.15.0`) on the merge commit. This triggers the stable addon builds.
+1. Merge changes to `main` using Conventional Commit messages (`feat:`, `fix:`, etc.).
+2. release-please opens (and keeps updating) a **release PR** that bumps the version in [rtl_433/config.json](rtl_433/config.json) and updates `CHANGELOG.md`.
+3. Merge the release PR. release-please then tags the release (`v<semver>`, e.g. `v0.1.1`) and creates a GitHub Release, which triggers the stable addon build.
 
 That's it! No branch reconciliation needed. Stable users see "Update Available" when the new version is published.
