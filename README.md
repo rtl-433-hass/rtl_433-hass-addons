@@ -26,7 +26,7 @@ All development happens on the `main` branch. The `-next` addons are built autom
 
 ### Creating a Release
 
-1. Create a pull request bumping the versions in [rtl_433/config.json](rtl_433/config.json) and/or [rtl_433_mqtt_autodiscovery/config.json](rtl_433_mqtt_autodiscovery/config.json). Update the corresponding `CHANGELOG.md` files.
+1. Create a pull request bumping the version in [rtl_433/config.json](rtl_433/config.json). Update the corresponding `CHANGELOG.md` file.
 2. After the PR is merged, create a date-based tag (e.g., `2025.01.15.0`) on the merge commit. This triggers the stable addon builds.
 
 That's it! No branch reconciliation needed. Stable users see "Update Available" when the new version is published.

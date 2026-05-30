@@ -16,7 +16,7 @@ Once you get the rtl_433 sensor data into MQTT, you'll need to help Home Assista
 
   * manually configure `sensors` and `binary_sensors` in HA and [link them to the appropriate MQTT topics](https://www.home-assistant.io/integrations/sensor.mqtt/) coming out of rtl_433,
   * run the [rtl_433_mqtt_hass.py](https://github.com/merbanan/rtl_433/tree/master/examples/rtl_433_mqtt_hass.py) script manually or on a schedule to do most of the configuration automatically, or
-  * install the [rtl_433 MQTT Auto Discovery Home Assistant Add-on](https://github.com/pbkhrv/rtl_433-hass-addons/tree/main/rtl_433_mqtt_autodiscovery), which runs rtl_433_mqtt_hass.py for you.
+  * install the dedicated [rtl_433 integration for Home Assistant](https://github.com/rtl-433-hass/rtl_433), which discovers and configures your devices automatically.
 
 ## Prerequisites
 
@@ -44,7 +44,7 @@ Once you get the rtl_433 sensor data into MQTT, you'll need to help Home Assista
 
 ## Configuration
 
-For a "zero configuration" setup, install the [Mosquitto broker](https://github.com/home-assistant/addons/blob/master/mosquitto/DOCS.md) addon. While other brokers may work, they are not tested and will require manual setup. Once the addon is installed, start or restart the rtl_433 and rtl_433_mqtt_autodiscovery addons to start capturing known 433 MHz protocols.
+For a "zero configuration" setup, install the [Mosquitto broker](https://github.com/home-assistant/addons/blob/master/mosquitto/DOCS.md) addon. While other brokers may work, they are not tested and will require manual setup. Once the addon is installed, start or restart the rtl_433 add-on to start capturing known 433 MHz protocols, and install the dedicated [rtl_433 integration](https://github.com/rtl-433-hass/rtl_433) so Home Assistant can discover your devices.
 
 For more advanced configuration, take a look at the example config file included in the rtl_433 source code: [rtl_433.example.conf](https://github.com/merbanan/rtl_433/blob/master/conf/rtl_433.example.conf)
 
@@ -70,7 +70,7 @@ You might also want to narrow down the list of protocols that rtl_433 should try
 protocol    40
 ```
 
-Last but not least, if you decide to use the MQTT auto discovery script or add-on, its documentation recommends converting units in all of the data coming out of rtl_433 into SI:
+Last but not least, if you decide to use the MQTT auto discovery script or integration, its documentation recommends converting units in all of the data coming out of rtl_433 into SI:
 
 ```
 convert     si

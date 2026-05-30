@@ -31,10 +31,9 @@ body:
     attributes:
       label: What addon are you reporting the bug for?
       description: >
-        Are you experiencing a bug with rtl_433 or rtl_433_mqtt_autodiscovery?
+        Are you experiencing a bug with the rtl_433 add-on?
       options:
-        - rtl_443
-        - rtl_433_mqtt_autodiscover
+        - rtl_433
   - type: input
     attributes:
       label: What is the addon version?
@@ -62,7 +61,6 @@ body:
       placeholder: "Copy and paste the addon log here"
       description: >-
         rtl_433 logs can be found in: [Settings -> Add-ons -> rtl_433](https://my.home-assistant.io/redirect/supervisor_addon/?addon=9b13b3f4_rtl433).
-        rtl_433_mqtt_autodiscovery logs can be found in: [Settings -> Add-ons -> rtl_433](https://my.home-assistant.io/redirect/supervisor_addon/?addon=9b13b3f4_rtl433mqttautodiscovery).
       render: txt
   - type: textarea
     attributes:

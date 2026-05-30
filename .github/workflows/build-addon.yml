@@ -42,9 +42,9 @@ jobs:
           BUILD_TYPE: ${{ inputs.build-type }}
         run: |
           case "${BUILD_TYPE}" in
-            release) addons='["rtl_433", "rtl_433_mqtt_autodiscovery"]' ;;
-            nightly) addons='["rtl_433-next", "rtl_433_mqtt_autodiscovery-next"]' ;;
-            test)    addons='["rtl_433", "rtl_433-next", "rtl_433_mqtt_autodiscovery", "rtl_433_mqtt_autodiscovery-next"]' ;;
+            release) addons='["rtl_433"]' ;;
+            nightly) addons='["rtl_433-next"]' ;;
+            test)    addons='["rtl_433", "rtl_433-next"]' ;;
             *)
               echo "::error::Unknown build-type: ${BUILD_TYPE}"
               exit 1
@@ -91,8 +91,6 @@ jobs:
         case "${ADDON}" in
           rtl_433-next)
             cp -nv -R rtl_433/* "${ADDON}/" ;;
-          rtl_433_mqtt_autodiscovery-next)
-            cp -nv -R rtl_433_mqtt_autodiscovery/* "${ADDON}/" ;;
         esac
 
     - name: Determine image version
