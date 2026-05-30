@@ -13,17 +13,22 @@
   "map": [
     "homeassistant_config:rw"
   ],
-  "services": [
-    "mqtt:want"
-  ],
   "usb": true,
   "udev": true,
-  "options": {
-    "rtl_433_conf_file": "",
-    "retain": true
-  },
-  "schema": {
-    "rtl_433_conf_file": "str?",
-    "retain": "bool"
+  "hassio_api": true,
+  "discovery": [
+    "rtl_433"
+  ],
+  "ports": {
+    "8433/tcp": 8433,
+    "8434/tcp": 8434,
+    "8435/tcp": 8435,
+    "8436/tcp": 8436,
+    "8437/tcp": 8437,
+    "8438/tcp": 8438,
+    "8439/tcp": 8439,
+    "8440/tcp": 8440,
+    "8441/tcp": 8441,
+    "8442/tcp": 8442
   }
 }

@@ -2,7 +2,7 @@
 id: 2
 group: "remove-mqtt-http"
 dependencies: []
-status: "pending"
+status: "completed"
 created: "2026-05-30"
 skills:
   - bash

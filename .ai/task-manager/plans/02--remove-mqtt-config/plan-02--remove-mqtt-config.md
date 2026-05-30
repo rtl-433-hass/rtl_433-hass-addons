@@ -201,10 +201,10 @@ graph TD
 
 No circular dependencies.
 
-### Phase 1: Foundation — metadata and entrypoint
+### ✅ Phase 1: Foundation — metadata and entrypoint
 **Parallel Tasks:**
-- Task 001: Update add-on config.json metadata for HTTP + discovery
-- Task 002: Rewrite run.sh — HTTP output with stable per-radio ports
+- ✔️ Task 001: Update add-on config.json metadata for HTTP + discovery
+- ✔️ Task 002: Rewrite run.sh — HTTP output with stable per-radio ports
 
 ### Phase 2: Discovery publication
 **Parallel Tasks:**

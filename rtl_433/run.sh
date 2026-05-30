@@ -3,61 +3,44 @@
 
 conf_directory="/config/rtl_433"
 
-if bashio::services.available "mqtt"; then
-    # These variables are used in the heredoc template via ${host}, ${password}, etc.
-    # shellcheck disable=SC2034
-    host=$(bashio::services "mqtt" "host")
-    # shellcheck disable=SC2034
-    password=$(bashio::services "mqtt" "password")
-    # shellcheck disable=SC2034
-    port=$(bashio::services "mqtt" "port")
-    # shellcheck disable=SC2034
-    username=$(bashio::services "mqtt" "username")
-    retain=$(bashio::config "retain")
-    if [ "$retain" = "true" ] ; then
-       retain=1
-    fi
-else
-    bashio::log.info "The mqtt addon is not available."
-    bashio::log.info "This is not a problem if you are using an external MQTT broker."
-    bashio::log.info "If you are using the Home Assistant Mosquitto Broker addon, try restarting it, and then restart the rtl_433 addon."
-    bashio::log.info "For an external broker, manually update the output line in the configuration file with mqtt connection settings, and restart the addon."
-fi
+# Base port for the first radio's HTTP server. Each additional radio is assigned
+# the next sequential port. The Home Assistant integration connects to
+# ws://<host>:<port>/ws.
+BASE_PORT=8433
+
+# Maximum number of radios (and therefore HTTP ports) supported. Templates
+# beyond this count are skipped.
+MAX_RADIOS=10
 
 if [ ! -d "$conf_directory" ]
 then
     mkdir -p "$conf_directory"
 fi
 
-# Check if the legacy configuration file is set and alert that it's deprecated.
-conf_file=$(bashio::config "rtl_433_conf_file")
-
-if [[ $conf_file != "" ]]
-then
-    bashio::log.warning "rtl_433 now supports automatic configuration and multiple radios. The rtl_433_conf_file option is deprecated. See the documentation for migration instructions."
-    conf_file="/config/$conf_file"
-
-    echo "Starting rtl_433 -c $conf_file"
-    rtl_433 -c "$conf_file"
-    exit $?
-fi
-
 # Create a reasonable default configuration in /config/rtl_433.
 if [ ! "$(ls -A "$conf_directory")" ]
 then
     cat > "$conf_directory"/rtl_433.conf.template <<EOD
-# This is an empty template for configuring rtl_433. mqtt information will be
-# automatically added. Create multiple files ending in '.conf.template' to
-# manage multiple rtl_433 radios, being sure to set the 'device' setting. The
-# device must be set before mqtt output lines.
+# This template configures rtl_433 to expose its decoded events over an HTTP
+# server. The Home Assistant integration connects to that server (ws://host:port/ws)
+# to receive device data. Each radio runs its own rtl_433 process with its own
+# HTTP port.
+#
+# Create multiple files ending in '.conf.template' to manage multiple rtl_433
+# radios. Each template MUST set a distinct 'device' so radios can be told apart,
+# for example 'device :SERIAL' or a SoapySDR device string. The 'device' line
+# must appear before any output lines.
+#
+# Radios are sorted by their 'device' value and assigned a stable HTTP port
+# starting at ${BASE_PORT} (so the first radio binds ${BASE_PORT}, the second
+# ${BASE_PORT}+1, and so on). The \${port} placeholder below is filled in at
+# render time with this radio's assigned port.
 # https://github.com/merbanan/rtl_433/blob/master/conf/rtl_433.example.conf
 
-output mqtt://\${host}:\${port},user=\${username},pass=\${password},retain=\${retain}
-report_meta time:iso:usec:tz
+device 0
 
-# To keep the same topics when switching between the normal and edge versions,
-# use this output line instead.
-# output mqtt://\${host}:\${port},user=\${username},pass=\${password},retain=\${retain},devices=rtl_433/9b13b3f4-rtl433/devices[/type][/model][/subtype][/channel][/id],events=rtl_433/9b13b3f4-rtl433/events,states=rtl_433/9b13b3f4-rtl433/states
+output http://0.0.0.0:\${port}
+report_meta time:iso:usec:tz
 
 # Uncomment the following line to also enable the default "table" output to the
 # addon logs.
@@ -105,16 +88,72 @@ fi
 # Remove all rendered configuration files.
 rm -f "$conf_directory"/*.conf
 
-rtl_433_pids=()
+# Build the list of templates, pairing each with its 'device' value so we can
+# sort deterministically and assign stable ports.
+templates_by_device=()
 for template in "$conf_directory"/*.conf.template
 do
+    # Skip the glob literal if no templates exist.
+    [ -e "$template" ] || continue
+
+    # Extract the device value from the first 'device ' line in the template.
+    device=$(grep -m1 '^[[:space:]]*device[[:space:]]' "$template" | sed -E 's/^[[:space:]]*device[[:space:]]+//')
+    if [ -z "$device" ]
+    then
+        bashio::log.warning "Template $template has no 'device' line; defaulting to an empty device value."
+    fi
+
+    # Prefix with the device value (tab-separated) so we can sort on it.
+    templates_by_device+=("${device}"$'\t'"${template}")
+done
+
+# Sort templates by device value for a deterministic, stable ordering.
+mapfile -t sorted_templates < <(printf '%s\n' "${templates_by_device[@]}" | sort)
+
+# Parallel arrays describing each launched radio. These are populated during port
+# assignment/launch and are the integration point for a later discovery task,
+# which iterates them to publish Home Assistant discovery.
+# shellcheck disable=SC2034  # consumed by the discovery step (see task 3)
+radio_devices=()
+# shellcheck disable=SC2034  # consumed by the discovery step (see task 3)
+radio_ports=()
+# shellcheck disable=SC2034  # consumed by the discovery step (see task 3)
+radio_tags=()
+
+rtl_433_pids=()
+index=0
+for entry in "${sorted_templates[@]}"
+do
+    # Split the "device<TAB>template" entry back into its parts.
+    device="${entry%%$'\t'*}"
+    template="${entry#*$'\t'}"
+
+    if [ "$index" -ge "$MAX_RADIOS" ]
+    then
+        bashio::log.warning "More than ${MAX_RADIOS} radio templates found; the maximum supported is ${MAX_RADIOS}. Skipping $template."
+        index=$((index + 1))
+        continue
+    fi
+
+    # Assign a stable port based on the sorted position of this radio.
+    # 'port' is referenced by the heredoc template via ${port}.
+    # shellcheck disable=SC2034
+    port=$((BASE_PORT + index))
+
     # Remove '.template' from the file name.
     live=$(basename "$template" .template)
+    tag=$(basename "$live" .conf)
+
+    radio_devices+=("$device")
+    radio_ports+=("$port")
+    radio_tags+=("$tag")
+
+    bashio::log.info "Radio '${device:-<none>}' (template $tag) assigned HTTP port ${port}."
 
     # By sourcing the template, we can substitute any environment variable in
     # the template. In fact, enterprising users could write _any_ valid bash
     # to create the final configuration file. To simplify template creation,
-    # we wrap the needed redirections into a temparary file.
+    # we wrap the needed redirections into a temporary file.
     {
         echo "cat <<EOD > $live"
         cat "$template"
@@ -128,9 +167,10 @@ do
     source /tmp/rtl_433_heredoc
 
     echo "Starting rtl_433 with $live..."
-    tag=$(basename "$live" .conf)
     rtl_433 -c "$live" > >(sed -u "s/^/[$tag] /") 2> >(>&2 sed -u "s/^/[$tag] /")&
     rtl_433_pids+=($!)
+
+    index=$((index + 1))
 done
 
 wait -n "${rtl_433_pids[@]}"
