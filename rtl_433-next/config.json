@@ -4,7 +4,7 @@
   "version": "next",
   "slug": "rtl433-next",
   "description": "Receive wireless sensor data via an SDR dongle and rtl_433",
-  "url": "https://github.com/pbkhrv/rtl_433-hass-addons/tree/main/rtl_433-next",
+  "url": "https://github.com/rtl-433-hass/rtl_433-hass-addons/tree/main/rtl_433-next",
   "arch": ["aarch64", "amd64"],
   "init": false,
   "map": ["homeassistant_config:rw"],

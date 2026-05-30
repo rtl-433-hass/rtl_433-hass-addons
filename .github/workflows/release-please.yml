@@ -1,0 +1,46 @@
+# release-please runs on every push to main: it maintains the release PR and,
+# when that PR merges, tags the release + creates the GitHub Release. The tag
+# (v*) is what triggers the stable addon build in release.yml.
+#
+# It authenticates with a short-lived token from an org-owned GitHub App rather
+# than the default GITHUB_TOKEN, because:
+#   * a PR created by GITHUB_TOKEN does not trigger other workflows (so the
+#     release PR would get no CI), whereas an App-created PR does; and
+#   * the App token is repo-scoped and not tied to a personal PAT.
+#
+# Requires two secrets (App ID + PEM private key) from a GitHub App installed on
+# this repo with only Contents: read/write and Pull requests: read/write:
+#   RELEASE_PLEASE_APP_ID
+#   RELEASE_PLEASE_APP_PRIVATE_KEY
+# Until those secrets exist, this workflow fails at the token step by design.
+#
+# This workflow runs only on push to main, so the App secrets are never exposed
+# to fork pull-request runs.
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+
+# No GITHUB_TOKEN permissions needed: the App token below carries its own
+# Contents/Pull-requests write scopes, and the token step authenticates via the
+# App key, not GITHUB_TOKEN.
+permissions: {}
+
+jobs:
+  release-please:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Mint a GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.RELEASE_PLEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

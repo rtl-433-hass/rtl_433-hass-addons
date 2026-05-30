@@ -1,7 +1,10 @@
 # Single-branch workflow:
 # - Push to main: Builds -next addons (development channel)
-# - Push tag (2*): Builds stable addons (production channel)
+# - Push tag (v*): Builds stable addons (production channel)
 # - Daily schedule: Builds -next addons with latest upstream rtl_433
+#
+# Stable release tags are created by release-please (see release-please.yml)
+# when a release PR merges, in the form v<semver> (e.g. v0.1.1).
 name: Create new rtl_433 addon release
 
 on:
@@ -9,7 +12,7 @@ on:
     branches:
       - main
     tags:
-      - '2*'
+      - 'v*'
   schedule:
     # A random daily time, as Actions doesn't have a suggestion for running
     # daily without causing job spikes.
