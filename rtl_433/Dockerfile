@@ -1,6 +1,6 @@
 ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.21
 # hadolint ignore=DL3006
-FROM $BUILD_FROM as builder
+FROM $BUILD_FROM AS builder
 
 ENV LANG C.UTF-8
 
@@ -23,7 +23,7 @@ RUN apk add --no-cache --virtual .buildDeps \
 
 WORKDIR /build
 
-FROM builder as rtl_433_builder
+FROM builder AS rtl_433_builder
 
 RUN git clone https://github.com/merbanan/rtl_433
 WORKDIR /build/rtl_433
@@ -42,7 +42,7 @@ WORKDIR /build/root
 WORKDIR /build/rtl_433/build
 RUN make DESTDIR=/build/root/ install
 
-FROM builder as soapy_hackrf_builder
+FROM builder AS soapy_hackrf_builder
 RUN git clone https://github.com/pothosware/SoapyHackRF.git
 WORKDIR /build/SoapyHackRF
 # hadolint ignore=DL3059
