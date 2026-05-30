@@ -30,7 +30,11 @@ jobs:
 
       - name: Verify rtl_433 --help works
         run: |
-          docker run --rm rtl_433-test:latest rtl_433 --help
+          # rtl_433 prints its usage to the help stream and exits non-zero by
+          # design, so assert on the output rather than the exit code.
+          output=$(docker run --rm rtl_433-test:latest rtl_433 --help 2>&1 || true)
+          echo "$output"
+          echo "$output" | grep -qi "Receive frequency"
 
       - name: Verify rtl_433 lists protocols
         run: |
