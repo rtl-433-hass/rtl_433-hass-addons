@@ -14,11 +14,11 @@ When starting, rtl_433 will show the version info such as:
 
 To find the upstream git commit rtl_433 was built from, drop the leading `g`. In the above example, rtl_433 was built with 89 commits since the 22.11 release, in git commit `416d6c4f`, which can be found at https://github.com/merbanan/rtl_433/commit/416d6c4f9768f22e7b4cfdd684c58df17c946dbc.
 
-To keep the same topics in MQTT when switching between the normal and next
-versions of the addon, change the `output` lines in each configuration file to:
-
-```
-output mqtt://${host}:${port},user=${username},pass=${password},retain=${retain},devices=rtl_433/9b13b3f4-rtl433/devices[/type][/model][/subtype][/channel][/id],events=rtl_433/9b13b3f4-rtl433/events,states=rtl_433/9b13b3f4-rtl433/states
-```
+Like the stable add-on, each radio runs its own rtl_433 process and exposes
+rtl_433's HTTP/WebSocket server with an `output http://0.0.0.0:${port}` line.
+The add-on assigns each radio a stable port starting at `8433`, and the
+[rtl_433 integration for Home Assistant](https://github.com/rtl-433-hass/rtl_433)
+connects to `ws://<addon-host>:<port>/ws` to consume the data. See the
+[stable add-on README](../rtl_433/README.md) for full configuration details.
 
 To update rtl_433 to the latest version, uninstall and reinstall the addon.
