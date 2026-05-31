@@ -12,6 +12,124 @@ BASE_PORT=8433
 # beyond this count are skipped.
 MAX_RADIOS=10
 
+# Base sysfs path for USB device enumeration. Overridable so the enumeration can
+# be exercised against a mock tree in tests.
+SYSFS_USB_BASE="${SYSFS_USB_BASE:-/sys/bus/usb/devices}"
+
+# Known RTL-SDR USB VID:PID identifiers (from librtlsdr's known-device table),
+# stored space-padded so a membership test is a simple glob. Used to pick out
+# RTL-SDR dongles while enumerating sysfs.
+RTLSDR_KNOWN_IDS=" 0bda:2832 0bda:2838 0413:6680 0413:6f0f 0458:707f \
+0ccd:00a9 0ccd:00b3 0ccd:00b4 0ccd:00b5 0ccd:00b7 0ccd:00b8 0ccd:00c0 0ccd:00c6 \
+0ccd:00d3 0ccd:00d7 0ccd:00e0 1554:5020 15f4:0131 15f4:0133 185b:0620 185b:0650 \
+185b:0680 1b80:d393 1b80:d394 1b80:d395 1b80:d397 1b80:d398 1b80:d39d 1b80:d3a4 \
+1b80:d3a8 1b80:d3af 1b80:d3b0 1d19:1101 1d19:1102 1d19:1103 1d19:1104 1f4d:a803 \
+1f4d:b803 1f4d:c803 1f4d:d286 1f4d:d803 1209:2832 "
+
+# Enumerate connected RTL-SDR dongles from sysfs. Prints one
+# "serial<TAB>portpath" line per matching device (serial may be empty), sorted
+# by port path for a deterministic ordering that approximates librtlsdr's index
+# enumeration. USB interfaces ('1-1.4:1.0'), root hubs ('usb1'), and non-RTL-SDR
+# devices are skipped. A missing/empty sysfs tree yields no output (and never
+# errors), so non-Supervisor runs degrade gracefully.
+enumerate_rtlsdr_devices() {
+    local dev name vid pid serial
+    for dev in "$SYSFS_USB_BASE"/*
+    do
+        [ -e "$dev" ] || continue
+        name="$(basename "$dev")"
+        # Skip USB interfaces (they carry a ':' in the node name).
+        case "$name" in
+            *:*) continue ;;
+        esac
+        if [ ! -r "$dev/idVendor" ] || [ ! -r "$dev/idProduct" ]
+        then
+            continue
+        fi
+        vid="$(cat "$dev/idVendor" 2>/dev/null)"
+        pid="$(cat "$dev/idProduct" 2>/dev/null)"
+        case "$RTLSDR_KNOWN_IDS" in
+            *" ${vid}:${pid} "*) ;;
+            *) continue ;;
+        esac
+        serial=""
+        if [ -r "$dev/serial" ]
+        then
+            serial="$(cat "$dev/serial" 2>/dev/null)"
+        fi
+        printf '%s\t%s\n' "$serial" "$name"
+    done | sort -t"$(printf '\t')" -k2,2 -V
+}
+
+# Decide whether a USB serial is usable as a stable identifier. A serial only
+# counts when it is present, not a known factory default/placeholder, not a
+# short reserved integer (which collides with the device index), and unique
+# among the enumerated dongles (the 'rtlsdr_devices' array). Args: <serial>.
+_serial_is_usable() {
+    local serial="$1" count=0 entry s
+    [ -n "$serial" ] || return 1
+    case "$serial" in
+        00000000|00000001) return 1 ;;
+    esac
+    [[ "$serial" =~ ^[0-9]{1,3}$ ]] && return 1
+    for entry in "${rtlsdr_devices[@]}"
+    do
+        s="${entry%%$'\t'*}"
+        [ "$s" = "$serial" ] && count=$((count + 1))
+    done
+    [ "$count" -le 1 ]
+}
+
+# Resolve a stable unique identifier for one radio. Args: <device_value> <tag>.
+# Reads the enumerated 'rtlsdr_devices' array. Layered strategy:
+#   1. usable serial      -> 'serial:<serial>'  (survives moving USB ports)
+#   2. else USB port path -> 'usbpath:<path>'   (stable per physical port)
+#   3. else template tag  -> 'template:<tag>'   (deterministic last resort)
+# The result is sanitised to a JSON-safe allowlist so the hand-built discovery
+# payload stays valid without jq.
+resolve_radio_unique_id() {
+    local device="$1" tag="$2"
+    local entry sel match_serial="" match_path="" found=0 result
+
+    if [ -n "$device" ] && [ "${device#:}" != "$device" ]
+    then
+        # ':SERIAL' selector — match the enumerated entry by serial.
+        sel="${device#:}"
+        for entry in "${rtlsdr_devices[@]}"
+        do
+            if [ "${entry%%$'\t'*}" = "$sel" ]
+            then
+                match_serial="${entry%%$'\t'*}"
+                match_path="${entry#*$'\t'}"
+                found=1
+                break
+            fi
+        done
+    elif [[ "$device" =~ ^[0-9]+$ ]]
+    then
+        # Bare index selector — take the Nth enumerated device.
+        if [ "$device" -lt "${#rtlsdr_devices[@]}" ]
+        then
+            entry="${rtlsdr_devices[$device]}"
+            match_serial="${entry%%$'\t'*}"
+            match_path="${entry#*$'\t'}"
+            found=1
+        fi
+    fi
+
+    if [ "$found" -eq 1 ] && _serial_is_usable "$match_serial"
+    then
+        result="serial:${match_serial}"
+    elif [ "$found" -eq 1 ] && [ -n "$match_path" ]
+    then
+        result="usbpath:${match_path}"
+    else
+        result="template:${tag}"
+    fi
+
+    printf '%s' "$result" | tr -c 'A-Za-z0-9:._-' '_'
+}
+
 if [ ! -d "$conf_directory" ]
 then
     mkdir -p "$conf_directory"
@@ -110,11 +228,16 @@ done
 # Sort templates by device value for a deterministic, stable ordering.
 mapfile -t sorted_templates < <(printf '%s\n' "${templates_by_device[@]}" | sort)
 
+# Enumerate RTL-SDR dongles once so each radio's identifier can be resolved from
+# real hardware (serial / USB port path) rather than the unstable device index.
+mapfile -t rtlsdr_devices < <(enumerate_rtlsdr_devices)
+
 # Parallel arrays describing each launched radio. These are populated during port
 # assignment/launch and consumed by the Supervisor discovery step below, which
 # iterates them to publish one Home Assistant discovery message per radio.
 radio_ports=()
 radio_tags=()
+radio_unique_ids=()
 
 rtl_433_pids=()
 index=0
@@ -140,10 +263,15 @@ do
     live=$(basename "$template" .template)
     tag=$(basename "$live" .conf)
 
+    # Resolve a stable identifier (serial -> USB port path -> template tag) to
+    # advertise so Home Assistant can keep a stable config entry per radio.
+    unique_id="$(resolve_radio_unique_id "$device" "$tag")"
+
     radio_ports+=("$port")
     radio_tags+=("$tag")
+    radio_unique_ids+=("$unique_id")
 
-    bashio::log.info "Radio '${device:-<none>}' (template $tag) assigned HTTP port ${port}."
+    bashio::log.info "Radio '${device:-<none>}' (template $tag) assigned HTTP port ${port} (unique_id ${unique_id})."
 
     # By sourcing the template, we can substitute any environment variable in
     # the template. In fact, enterprising users could write _any_ valid bash
@@ -206,20 +334,22 @@ publish_discovery() {
         return 0
     fi
 
-    local i port tag body http_code
+    local i port tag uid body http_code
     for i in "${!radio_ports[@]}"
     do
         port="${radio_ports[$i]}"
         tag="${radio_tags[$i]}"
+        uid="${radio_unique_ids[$i]}"
 
         # Build the discovery payload with printf (jq is not in the runtime
         # image). 'service' MUST equal the discovery entry in config.json
-        # ("rtl_433"). The integration connects to ws://<host>:<port>/ws.
-        # host/port are interpolated; the static keys/values are literal, so no
-        # untrusted data is embedded that would need JSON escaping.
+        # ("rtl_433"). The integration connects to ws://<host>:<port>/ws and uses
+        # 'unique_id' as a stable per-radio key. host/port are interpolated; the
+        # unique_id is pre-sanitised to a JSON-safe character set by
+        # resolve_radio_unique_id, so no further JSON escaping is needed.
         printf -v body \
-            '{"service": "rtl_433", "config": {"host": "%s", "port": %s, "path": "/ws", "secure": false}}' \
-            "$host" "$port"
+            '{"service": "rtl_433", "config": {"host": "%s", "port": %s, "path": "/ws", "secure": false, "unique_id": "%s"}}' \
+            "$host" "$port" "$uid"
 
         # Best-effort POST. Capture the HTTP status separately from the body so
         # a non-2xx response or a curl failure is logged but never aborts the
