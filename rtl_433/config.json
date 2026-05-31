@@ -11,7 +11,7 @@
   ],
   "init": false,
   "map": [
-    "homeassistant_config:rw"
+    "addon_config:rw"
   ],
   "usb": true,
   "udev": true,
@@ -19,6 +19,12 @@
   "discovery": [
     "rtl_433"
   ],
+  "options": {
+    "log_received_messages": false
+  },
+  "schema": {
+    "log_received_messages": "bool"
+  },
   "ports": {
     "8433/tcp": 8433,
     "8434/tcp": 8434,
