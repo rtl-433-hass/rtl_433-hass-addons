@@ -16,6 +16,14 @@ The [rtl_433 integration for Home Assistant](https://github.com/rtl-433-hass/rtl
 
 The add-on also publishes each radio to Home Assistant's Supervisor discovery API (best-effort). Full automatic setup depends on the rtl_433 integration adding Supervisor discovery support, which it does not have yet. Until then, add the integration manually in **Settings -> Devices & Services -> rtl_433**, supplying the add-on host and the radio's port.
 
+Each discovery message carries a stable `unique_id` so the integration can keep the same config entry for a radio across restarts and port reassignments. The add-on derives it, in order of preference, from:
+
+ 1. the dongle's **USB serial**, when it is unique and not the factory default (this survives moving the dongle to a different USB port);
+ 2. otherwise the dongle's **USB port path** — which physical port it is plugged into (stable as long as the dongle stays in that port);
+ 3. otherwise the **configuration template's name** (a deterministic last resort for devices the add-on can't match to a USB RTL-SDR entry, such as SoapySDR/HackRF devices).
+
+Because nearly all RTL-SDR dongles ship with the same default serial (`00000001`), multi-dongle setups get the most stable identity either by keeping each dongle in a fixed USB port or by flashing a unique serial with `rtl_eeprom -s <serial>` (a one-time step performed outside the add-on).
+
 ## Prerequisites
 
  To use this add-on, you need the following:
