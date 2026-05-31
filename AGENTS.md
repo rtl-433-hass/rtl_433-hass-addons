@@ -43,6 +43,27 @@ Each add-on has its own directory:
 
 The `-next` variants are development versions built from `main`.
 
+## Releases & Changelogs
+
+Releases are managed by [release-please](https://github.com/googleapis/release-please)
+(`release-please-config.json` + `.release-please-manifest.json`). On each push to
+`main` it maintains a release PR; merging that PR tags the release, bumps
+`rtl_433/config.json` `$.version`, and prepends a new entry to
+`rtl_433/CHANGELOG.md` derived from Conventional Commits.
+
+Because of this:
+- **Do not hand-edit `rtl_433/CHANGELOG.md` for releases, and do not add an
+  `[Unreleased]` section.** The open release PR is the "unreleased" view; it is
+  built automatically from commit messages. Accurate Conventional Commit
+  messages are what produce good changelog entries.
+- This project is a fork but is versioned independently as a new, parallel
+  add-on, so its version numbers were reset and start at `0.1.0`. Entries below
+  the latest release in `rtl_433/CHANGELOG.md` are pre-fork history kept for
+  reference.
+- The `-next` add-on is a rolling build with no version numbers, so it is **not**
+  a release-please package. Its `CHANGELOG.md` just links to the `main` commit
+  history rather than carrying per-release notes.
+
 ## Pull Requests
 
 The pull request title should always be the value of the first commit in the branch.
