@@ -54,7 +54,15 @@ Because nearly all RTL-SDR dongles ship with the same default serial (`00000001`
 
 ## Configuration
 
-For a "zero configuration" setup, just start the add-on and install the dedicated [rtl_433 integration](https://github.com/rtl-433-hass/rtl_433). The built-in default config captures common protocols (and disables noisy TPMS protocols) and exposes the data over rtl_433's HTTP/WebSocket server, which the integration consumes. **No file editing is required for the default case.**
+For a "zero configuration" setup, just start the add-on and install the dedicated [rtl_433 integration](https://github.com/rtl-433-hass/rtl_433). The built-in default config captures common protocols (and disables noisy TPMS protocols by default) and exposes the data over rtl_433's HTTP/WebSocket server, which the integration consumes. **No file editing is required for the default case.**
+
+### Disable TPMS sensors
+
+The **Disable TPMS sensors** option in the add-on's Configuration tab controls whether tyre-pressure (TPMS) decoders are disabled. It is **on by default**: passing cars constantly broadcast TPMS data, which can otherwise flood Home Assistant with a large number of short-lived devices and entities.
+
+When enabled, the add-on appends a set of `protocol -<n>` disables — generated at image build time from the bundled rtl_433's own decoder list, so they always match the rtl_433 version in the image — to every radio's config. When you **uncheck** it, no `protocol` lines are emitted at all, so every decoder rtl_433 ships (TPMS included) is enabled, exactly as if you had selected no protocols.
+
+Note that because protocol selection is subtractive/exclusive (see the override note below), this all-or-nothing toggle is the supported way to re-enable TPMS: you cannot keep the other defaults *and* re-enable a single TPMS sensor via an override file.
 
 ### Per-radio overrides
 
