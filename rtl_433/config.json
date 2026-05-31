@@ -20,10 +20,12 @@
     "rtl_433"
   ],
   "options": {
-    "log_received_messages": false
+    "log_received_messages": false,
+    "log_diagnostic_messages": false
   },
   "schema": {
-    "log_received_messages": "bool"
+    "log_received_messages": "bool",
+    "log_diagnostic_messages": "bool"
   },
   "ports": {
     "8433/tcp": 8433,
