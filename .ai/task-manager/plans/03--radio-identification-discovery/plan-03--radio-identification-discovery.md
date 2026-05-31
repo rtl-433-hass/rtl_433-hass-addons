@@ -196,9 +196,9 @@ graph TD
     001[Task 001: Implement identification + unique_id in run.sh] --> 002[Task 002: Document unique_id derivation in README]
 ```
 
-### Phase 1: Implementation
+### ✅ Phase 1: Implementation
 **Parallel Tasks:**
-- Task 001: Implement sysfs enumeration, layered identifier resolver, launch-loop wiring, and `unique_id` discovery payload in `rtl_433/run.sh`
+- ✔️ Task 001: Implement sysfs enumeration, layered identifier resolver, launch-loop wiring, and `unique_id` discovery payload in `rtl_433/run.sh` (status: completed)
 
 ### Phase 2: Documentation
 **Parallel Tasks:**
