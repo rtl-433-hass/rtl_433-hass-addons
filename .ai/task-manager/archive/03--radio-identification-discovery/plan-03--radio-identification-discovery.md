@@ -210,5 +210,28 @@ graph TD
 ### Execution Summary
 - Total Phases: 2
 - Total Tasks: 2
-</content>
-</invoke>
+
+## Execution Summary
+
+**Status**: ✅ Completed Successfully
+**Completed Date**: 2026-05-31
+
+### Results
+Implemented stable per-radio identification in `rtl_433/run.sh` and documented it in `rtl_433/README.md`:
+
+- `enumerate_rtlsdr_devices` reads `/sys/bus/usb/devices/*` (base path overridable via `SYSFS_USB_BASE`), filters to the known librtlsdr VID:PID table, and emits `serial<TAB>portpath` per dongle, sorted by port path. Missing sysfs → empty output, no error.
+- `resolve_radio_unique_id` maps each radio's `device` value to an enumerated dongle and returns a sanitised, namespaced identifier: `serial:<serial>` (unique, non-default serial) → `usbpath:<portpath>` → `template:<tag>`.
+- The launch loop populates a `radio_unique_ids` parallel array; `publish_discovery()` now emits `"unique_id"` inside the discovery `config` object.
+- README discovery section explains the derivation and the unique-serial/fixed-port guidance.
+
+All four self-validation procedures passed: `bash -n` + shellcheck (clean), 8/8 resolver table cases, mock-sysfs enumeration (correct filtering/ordering, hub + interface excluded, empty serial handled), and JSON validity of the payload including `unique_id`.
+
+### Noteworthy Events
+- shellcheck flagged `SC2015` (`A && B || C`) on the readability check; restructured to an explicit `if` guard. No other issues.
+- `pre-commit` could not be installed on the host (PEP 668); the relevant gates were run directly instead — `shellcheck 0.10.0` (matching the pinned hook), plus manual trailing-whitespace/EOF checks. `hadolint-docker` was not applicable (no Dockerfile changed).
+- Scope held to additive identifier resolution; the launch model, port assignment, and `-d` invocation were left unchanged. The longer-term concatenated base+override config restructuring remains out of scope, with the resolver kept pure for future reuse.
+
+### Necessary follow-ups
+- Integration-side consumption (`async_set_unique_id` via `async_step_hassio`) in the separate `rtl-433-hass/rtl_433` repo, to actually use the advertised `unique_id`.
+- Optional hardening of the index→sysfs mapping (e.g. parsing rtl_433's own startup log) for multi-identical-dongle setups; the pure resolver allows this without touching callers.
+- Decide the disposition of the untracked `MULTI-RADIO-DISCOVERY.md` research doc (keep/move/trim) — tracked separately from this plan.
