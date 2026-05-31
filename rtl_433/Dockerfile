@@ -78,6 +78,9 @@ COPY --from=soapy_hackrf_builder /usr/lib /lib-s
 RUN mkdir -p /usr/local/lib/SoapySDR/modules0.8/
 COPY --from=soapy_hackrf_builder /usr/local/lib/SoapySDR/modules0.8/libHackRFSupport.so /usr/local/lib/SoapySDR/modules0.8/
 
+# Default rtl_433 configuration baked into the image
+COPY rtl_433.defaults.conf /etc/rtl_433/rtl_433.defaults.conf
+
 # Run script
 COPY run.sh /
 # hadolint ignore=DL3059
