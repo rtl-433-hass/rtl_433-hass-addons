@@ -40,6 +40,15 @@ Each add-on has its own directory:
 - `Dockerfile` - container build
 - `run.sh` - entrypoint script
 - `CHANGELOG.md` - version history
+- `rtl_433/rtl_433.defaults.conf` - the internal default rtl_433 config baked
+  into the image (copied to `/etc/rtl_433/rtl_433.defaults.conf`). It is not
+  user-editable; user customization happens via per-radio `<id>.conf` override
+  files that are appended to it.
+
+User override files live in the **add-on config directory** (the `addon_config`
+map, reachable at `/addon_configs/<slug>/`), **not** the Home Assistant config
+directory. The add-on auto-detects connected RTL-SDR dongles and renders each
+radio's config from the baked-in default plus any matching override file.
 
 The `-next` variants are development versions built from `main`.
 
