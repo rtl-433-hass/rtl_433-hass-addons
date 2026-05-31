@@ -2,7 +2,7 @@ ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.23
 # hadolint ignore=DL3006
 FROM $BUILD_FROM AS builder
 
-ENV LANG C.UTF-8
+ENV LANG=C.UTF-8
 
 # Copied with minor edits from https://github.com/hertzg/rtl_433_docker/blob/master/images/alpine/build-context/Dockerfile
 # DL3018 (pin apk versions) is ignored on purpose: Alpine removes superseded
@@ -58,7 +58,7 @@ RUN make install
 # hadolint ignore=DL3006
 FROM $BUILD_FROM
 
-ENV LANG C.UTF-8
+ENV LANG=C.UTF-8
 
 # DL3018 (pin apk versions) is ignored on purpose: Alpine removes superseded
 # package versions from its repos, so exact pins break the build as soon as a
