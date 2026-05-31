@@ -3,6 +3,19 @@
 * Update Alpine base to 3.21
 * Update the stable addon to rtl_433 25.02
 
+## [0.2.0](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.1.0...v0.2.0) (2026-05-31)
+
+
+### ⚠ BREAKING CHANGES
+
+* **rtl_433:** MQTT output, the retain option, and the rtl_433_conf_file option are removed. Configurations must use rtl_433 HTTP output and the rtl_433 Home Assistant integration.
+
+### Features
+
+* **rtl_433:** advertise a stable per-radio unique_id in discovery ([#66](https://github.com/rtl-433-hass/rtl_433-hass-addons/issues/66)) ([c0a4c65](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/c0a4c65da06acdb14dd3ba9484c257d7853a58c5))
+* **rtl_433:** expose radios over HTTP instead of MQTT ([be095a9](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/be095a993a37da2cc9cb0ecc7d51414252946182))
+* **rtl_433:** publish radios to Supervisor discovery API ([3b695bc](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/3b695bcb057bb3d68ad72e4587e80eb30ec2b007))
+
 ## [0.1.0](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.0.1...v0.1.0) (2026-05-30)
 
 
