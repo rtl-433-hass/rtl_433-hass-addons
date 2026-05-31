@@ -195,65 +195,32 @@ matched_ids=" "
 
 rtl_433_pids=()
 
-if [ "${#rtlsdr_devices[@]}" -eq 0 ]
-then
-    bashio::log.warning "No RTL-SDR dongles detected; no rtl_433 process will be launched."
-fi
-
-for i in "${!rtlsdr_devices[@]}"
-do
-    if [ "$i" -ge "$MAX_RADIOS" ]
-    then
-        bashio::log.warning "More than ${MAX_RADIOS} RTL-SDR dongles detected; the maximum supported is ${MAX_RADIOS}. Skipping the rest."
-        break
-    fi
-
-    entry="${rtlsdr_devices[$i]}"
-    serial="${entry%%$'\t'*}"
-    portpath="${entry#*$'\t'}"
-
+# Render one radio's config from the baked-in default and launch rtl_433 for it.
+# Args:
+#   $1 port          - assigned HTTP port (substituted into the default's ${port})
+#   $2 tag           - short label used for log prefixing and the render filename
+#   $3 device_line   - 'device ...' line injected before the default (empty when
+#                      the device selection is left entirely to the default)
+#   $4 override_file - file whose contents are appended after the default (may be
+#                      empty)
+#   $5 uid           - discovery unique_id
+#   $6 source_label  - path shown in the 'appended from' comment (defaults to $4)
+launch_radio() {
     # 'port' is referenced by the rendered heredoc via ${port}.
     # shellcheck disable=SC2034
-    port=$((BASE_PORT + i))
+    local port="$1" tag="$2" device_line="$3" override_file="$4" uid="$5" source_label="${6:-$4}"
+    local live="${render_dir}/${tag}.conf"
 
-    # Determine the rtl_433 device selector for this dongle: a ':SERIAL' selector
-    # when the serial is usable, else the bare enumeration index.
-    if _serial_is_usable "$serial"
-    then
-        selector=":${serial}"
-    else
-        selector="$i"
-    fi
-    device_line="device ${selector}"
-
-    # Raw, filename-safe identifier used to match an override file.
-    match_id="$(radio_match_id "$serial" "$portpath")"
-    expected_file="${conf_directory}/${match_id}.conf"
-
-    # Resolve a stable identifier (serial -> USB port path) for discovery. Pass
-    # the same selector used above so the resolution matches this enumerated
-    # entry.
-    unique_id="$(resolve_radio_unique_id "$selector" "$match_id")"
-
-    radio_ports+=("$port")
-    radio_tags+=("$match_id")
-    radio_unique_ids+=("$unique_id")
-    matched_ids+="${match_id} "
-
-    bashio::log.info "Radio ${match_id} -> HTTP port ${port}. To customize, create ${expected_file}."
-
-    live="${render_dir}/${match_id}.conf"
-
-    # Build the raw rendered config: injected device line + baked-in default +
-    # any matching override file + an optional 'output kv' for the log option.
+    # Build the raw rendered config: optional injected device line + baked-in
+    # default + any override file + optional 'output kv'/'output log' lines.
     {
-        echo "$device_line"
+        [ -n "$device_line" ] && echo "$device_line"
         cat "$default_conf"
-        if [ -f "$expected_file" ]
+        if [ -n "$override_file" ] && [ -f "$override_file" ]
         then
             echo
-            echo "# --- appended from ${expected_file} ---"
-            cat "$expected_file"
+            echo "# --- appended from ${source_label} ---"
+            cat "$override_file"
         fi
         if [ "$log_received_messages" = "true" ]
         then
@@ -281,21 +248,104 @@ do
     source /tmp/rtl_433_heredoc
 
     echo "Starting rtl_433 with $live..."
-    rtl_433 -c "$live" > >(sed -u "s/^/[$match_id] /") 2> >(>&2 sed -u "s/^/[$match_id] /")&
-    rtl_433_pids+=($!)
+    rtl_433 -c "$live" > >(sed -u "s/^/[$tag] /") 2> >(>&2 sed -u "s/^/[$tag] /")&
+    rtl_433_pids+=("$!")
+
+    radio_ports+=("$port")
+    radio_tags+=("$tag")
+    radio_unique_ids+=("$uid")
+}
+
+if [ "${#rtlsdr_devices[@]}" -eq 0 ]
+then
+    bashio::log.warning "No RTL-SDR dongles detected; only explicitly-declared radios (if any) will be launched."
+fi
+
+for i in "${!rtlsdr_devices[@]}"
+do
+    if [ "$i" -ge "$MAX_RADIOS" ]
+    then
+        bashio::log.warning "More than ${MAX_RADIOS} RTL-SDR dongles detected; the maximum supported is ${MAX_RADIOS}. Skipping the rest."
+        break
+    fi
+
+    entry="${rtlsdr_devices[$i]}"
+    serial="${entry%%$'\t'*}"
+    portpath="${entry#*$'\t'}"
+
+    port=$((BASE_PORT + i))
+
+    # Determine the rtl_433 device selector for this dongle: a ':SERIAL' selector
+    # when the serial is usable, else the bare enumeration index.
+    if _serial_is_usable "$serial"
+    then
+        selector=":${serial}"
+    else
+        selector="$i"
+    fi
+
+    # Raw, filename-safe identifier used to match an override file.
+    match_id="$(radio_match_id "$serial" "$portpath")"
+    expected_file="${conf_directory}/${match_id}.conf"
+    matched_ids+="${match_id} "
+
+    # Resolve a stable identifier (serial -> USB port path) for discovery. Pass
+    # the same selector used above so the resolution matches this enumerated
+    # entry.
+    unique_id="$(resolve_radio_unique_id "$selector" "$match_id")"
+
+    bashio::log.info "Radio ${match_id} -> HTTP port ${port}. To customize, create ${expected_file}."
+
+    launch_radio "$port" "$match_id" "device ${selector}" "$expected_file" "$unique_id"
 done
 
-# Warn about override files that match no detected radio so a typo or unplugged
-# dongle does not silently do nothing.
+# Launch explicitly-declared radios from config-dir files that did not match a
+# detected RTL-SDR dongle. Such a file becomes its own radio only when it carries
+# its own 'device' line (e.g. a SoapySDR/HackRF device string that cannot be
+# auto-detected); otherwise it is an orphan (typo or unplugged dongle) and is
+# ignored with a warning. Auto-detected radios were launched first, so these are
+# assigned the next free ports.
 for f in "$conf_directory"/*.conf
 do
     # Skip the glob literal when no override files exist.
     [ -e "$f" ] || continue
+
     base="$(basename "$f" .conf)"
+
+    # Skip files already consumed as an override for a detected radio.
     case "$matched_ids" in
-        *" ${base} "*) ;;
-        *) bashio::log.warning "Override file ${f} matches no detected RTL-SDR radio; ignoring it." ;;
+        *" ${base} "*) continue ;;
     esac
+
+    if ! grep -qE '^[[:space:]]*device[[:space:]]' "$f"
+    then
+        bashio::log.warning "Config file ${f} matches no detected RTL-SDR radio and declares no 'device' line; ignoring it."
+        continue
+    fi
+
+    if [ "${#radio_ports[@]}" -ge "$MAX_RADIOS" ]
+    then
+        bashio::log.warning "Maximum of ${MAX_RADIOS} radios reached; skipping explicitly-declared radio ${f}."
+        continue
+    fi
+
+    # Filename-safe tag, consistent with how detected identifiers are sanitised.
+    tag="$(printf '%s' "$base" | tr -c 'A-Za-z0-9:._-' '_')"
+    port=$((BASE_PORT + ${#radio_ports[@]}))
+
+    # Pull the 'device' line out so it can be injected before the default's output
+    # line (rtl_433 expects 'device' before any 'output'); append the rest of the
+    # user's file with its 'device' lines stripped to avoid a duplicate after the
+    # output line.
+    device_value="$(grep -m1 -E '^[[:space:]]*device[[:space:]]' "$f" | sed -E 's/^[[:space:]]*device[[:space:]]+//')"
+    stripped="${render_dir}/${tag}.user"
+    grep -vE '^[[:space:]]*device[[:space:]]' "$f" > "$stripped"
+
+    unique_id="$(resolve_radio_unique_id "$device_value" "$tag")"
+
+    bashio::log.info "Explicitly-declared radio ${tag} (device '${device_value}') -> HTTP port ${port}."
+
+    launch_radio "$port" "$tag" "device ${device_value}" "$stripped" "$unique_id" "$f"
 done
 
 # ---------------------------------------------------------------------------
