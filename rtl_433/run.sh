@@ -166,6 +166,15 @@ then
     log_received_messages="true"
 fi
 
+# Read the "Log diagnostic messages" add-on option. When true, 'output log' is
+# appended to every radio's rendered config so rtl_433's own status/diagnostic
+# messages show in the log. This is separate from the decoded-event 'output kv'.
+log_diagnostic_messages="false"
+if bashio::config.true 'log_diagnostic_messages'
+then
+    log_diagnostic_messages="true"
+fi
+
 # Directory rendered configs are written to. Never the user config directory.
 mkdir -p "$render_dir"
 
@@ -250,6 +259,11 @@ do
         then
             echo
             echo "output kv"
+        fi
+        if [ "$log_diagnostic_messages" = "true" ]
+        then
+            echo
+            echo "output log"
         fi
     } > "${live}.raw"
 

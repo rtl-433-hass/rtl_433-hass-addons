@@ -24,7 +24,8 @@ To customize a radio, create an `<id>.conf` override file in the add-on config
 directory (`/addon_configs/rtl433-next/`); the exact filename for each detected
 radio is printed in the add-on log. Override directives are appended to the
 default and win on conflict. The **Log received messages** option (Configuration
-tab) adds `output kv` so decoded events show in the log. See the
+tab) adds `output kv` so decoded events show in the log, and **Log diagnostic
+messages** adds `output log` for rtl_433's own status messages. See the
 [stable add-on README](../rtl_433/README.md) for full configuration details.
 
 To update rtl_433 to the latest version, uninstall and reinstall the addon.

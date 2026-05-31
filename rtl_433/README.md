@@ -86,7 +86,12 @@ An override file whose name does not match any detected radio is ignored, and th
 
 ### Logging
 
-The **Log received messages** option (in the add-on's Configuration tab) appends `output kv` to each radio's config so decoded events appear in the add-on log. This is useful for confirming that sensors are being received. The rtl_433 diagnostic `output log` is intentionally **not** bundled, to keep the log readable.
+Two independent options in the add-on's Configuration tab control what rtl_433 writes to the add-on log:
+
+ - **Log received messages** appends `output kv` to each radio's config, so decoded sensor events appear in the log. Useful for confirming that sensors are being received.
+ - **Log diagnostic messages** appends `output log` to each radio's config, so rtl_433's own status/diagnostic messages appear in the log. Useful for troubleshooting the radios themselves.
+
+Both default to off and can be enabled independently.
 
 ### Breaking change / migration
 
