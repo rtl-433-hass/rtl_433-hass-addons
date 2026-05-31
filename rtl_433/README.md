@@ -8,9 +8,9 @@ This add-on is a simple wrapper around the excellent [rtl_433](https://github.co
 
 ## How it works
 
-This add-on runs rtl_433 under the Home Assistant OS supervisor. All you have to do is supply a config file.
+This add-on runs rtl_433 under the Home Assistant OS supervisor. It works with **no configuration**: just install it, plug in your dongle(s), and start it.
 
-Each radio runs its own rtl_433 process, and each process exposes rtl_433's built-in HTTP/WebSocket server with an `output http://0.0.0.0:<port>` line in its config. The add-on assigns each radio a stable TCP port starting at `8433` (the second radio gets `8434`, and so on, up to a maximum of 10 radios). Ports are assigned deterministically by sorting the templates by their `device` value, so a given radio keeps the same port across restarts.
+On start, the add-on auto-detects every connected RTL-SDR dongle and runs one rtl_433 process per dongle, using an internal default config baked into the image. Each process exposes rtl_433's built-in HTTP/WebSocket server with an `output http://0.0.0.0:<port>` line that the default config already provides. The add-on assigns each radio a stable TCP port starting at `8433` (the second radio gets `8434`, and so on, up to a maximum of 10 radios). Ports are assigned deterministically, so a given radio keeps the same port across restarts.
 
 The [rtl_433 integration for Home Assistant](https://github.com/rtl-433-hass/rtl_433) is the consumer of this data: it connects to each radio over `ws://<addon-host>:<port>/ws` and discovers and configures your devices automatically.
 
@@ -36,64 +36,82 @@ Because nearly all RTL-SDR dongles ship with the same default serial (`00000001`
 
 ## Installation
 
- 1. Create an rtl_433 config file that does what you need. It might work better if you do this on a computer other than the one running Home Assistant OS, so that you can experiment freely and iterate until you arrive at a configuration that works well. See below for more details.
+ 1. Install the add-on.
 
- 2. Upload the config file into Home Assistant's "/config" directory using whatever method works for you (via Samba add-on, ssh/scp, File Editor add-on etc).
+ 2. Plug your SDR dongle(s) into the machine running the add-on.
 
- 3. Install the add-on.
+ 3. Start the add-on. No configuration is required — it auto-detects every connected RTL-SDR dongle and starts one rtl_433 process per dongle using a built-in default config.
 
- 5. Plug your SDR dongle to the machine running the add-on.
+ 4. Check the logs. For each detected radio the add-on prints a line like:
 
- 5. Start the addon. A default configuration will be created in `/config/rtl_433/`. To add or edit additional configurations, create multiple `.conf.template` files in that directory.
+    ```
+    Radio <id> -> HTTP port <port>. To customize, create /config/<id>.conf.
+    ```
 
- 6. Start the add-on and check the logs.
+    The `<id>` is that radio's stable identifier (its USB serial when usable, otherwise its USB port path). You only need this if you want to customize a radio (see [Configuration](#configuration) below).
+
+ 5. Install the dedicated [rtl_433 integration](https://github.com/rtl-433-hass/rtl_433) in Home Assistant and point it at the add-on host and each radio's port.
 
 ## Configuration
 
-For a "zero configuration" setup, just start the add-on with the default config and install the dedicated [rtl_433 integration](https://github.com/rtl-433-hass/rtl_433). The default configuration captures known 433 MHz protocols and exposes them over rtl_433's HTTP/WebSocket server, which the integration consumes.
+For a "zero configuration" setup, just start the add-on and install the dedicated [rtl_433 integration](https://github.com/rtl-433-hass/rtl_433). The built-in default config captures common protocols (and disables noisy TPMS protocols) and exposes the data over rtl_433's HTTP/WebSocket server, which the integration consumes. **No file editing is required for the default case.**
 
-For more advanced configuration, take a look at the example config file included in the rtl_433 source code: [rtl_433.example.conf](https://github.com/merbanan/rtl_433/blob/master/conf/rtl_433.example.conf)
+### Per-radio overrides
 
-Note that since the configuration file has bash variables in it, **dollar signs and other special shell characters need to be escaped**. For example, to use the literal string `$GPRMC` in the configuration file, use `\$GPRMC`.
-
-When configuring manually, assuming that you intend to get the rtl_433 data into Home Assistant, the absolute minimum that you need to specify in the config file is the [HTTP output](https://triq.org/rtl_433/OPERATION.html#http-server). The add-on fills in the radio's assigned port via the `${port}` placeholder, so use:
+To customize a specific radio, create an override file named after that radio's identifier. Each detected radio's exact override filename is printed in the add-on log on start, for example:
 
 ```
-output      http://0.0.0.0:${port}
+Radio <id> -> HTTP port <port>. To customize, create /config/<id>.conf.
 ```
 
-This makes rtl_433 expose its decoded events over an HTTP/WebSocket server on the port the add-on assigned to this radio (the first radio gets `8433`, the next `8434`, and so on). The Home Assistant rtl_433 integration then connects to `ws://<addon-host>:<port>/ws` to receive the data.
+Create that `<id>.conf` file in the **add-on config directory**. From Home Assistant this directory is reachable at `/addon_configs/rtl433/` (use the Samba, File Editor, or Studio Code Server add-ons to edit files there). So a radio logged as `Radio AB12CD34 -> ...` is customized by creating `/addon_configs/rtl433/AB12CD34.conf`.
 
-rtl_433 defaults to listening on 433.92MHz, but even if that's what you need, it's probably a good idea to specify the frequency explicitly to avoid confusion:
-
-```
-frequency   433.92M
-```
-
-You might also want to narrow down the list of protocols that rtl_433 should try to decode. The full list can be found under "Supported device protocols" section of the [README](https://github.com/merbanan/rtl_433/blob/master/README.md). Let's say you want to listen to Acurite 592TXR temperature/humidity sensors:
+Put **only the extra directives you want** in the override file — they are appended to the internal default config, and on any conflict the override wins (rtl_433 applies the last matching directive). For example:
 
 ```
-protocol    40
+frequency 868M
+protocol  40
+convert   si
 ```
 
-Last but not least, the rtl_433 integration's documentation recommends converting units in all of the data coming out of rtl_433 into SI:
+Notes:
+
+ - The default already provides `output http://0.0.0.0:${port}`, so **do not add an `output http://...` line yourself**; the `${port}` placeholder is filled in with the radio's assigned port automatically.
+ - **Overriding `device` is discouraged**: it breaks the file-to-radio mapping the add-on relies on.
+ - **Protocol selection is subtractive or exclusive, never additive** (this is rtl_433's own `-R` behaviour). The default disables noisy protocols such as TPMS with negative entries like `protocol -60`, which keep every *other* decoder enabled. In an appended override, another `protocol -<n>` simply disables one more decoder. A *positive* `protocol <n>`, however, switches rtl_433 to "enable only these": it enables just the positively-listed protocols and disables everything else — so `protocol 40` means "decode **only** protocol 40", not "also decode 40". Consequently you cannot re-enable one of the default-disabled protocols (for example a single TPMS sensor) *and* keep the other decoders, because doing so requires a positive entry, which is exclusive.
+ - Because the file is rendered through a shell heredoc, **dollar signs and other special shell characters need to be escaped**. For example, to use the literal string `$GPRMC`, write `\$GPRMC`.
+
+For the full list of available directives, see the example config in the rtl_433 source: [rtl_433.example.conf](https://github.com/merbanan/rtl_433/blob/master/conf/rtl_433.example.conf), the [official rtl_433 documentation](https://triq.org/rtl_433), and the supported protocol list in the [rtl_433 README](https://github.com/merbanan/rtl_433/blob/master/README.md).
+
+An override file whose name does not match any detected radio **and** does not declare its own `device` line is ignored, and the add-on logs a warning so a typo or an unplugged dongle does not silently do nothing.
+
+### Non-RTL-SDR radios (SoapySDR / HackRF)
+
+Auto-detection only finds **RTL-SDR** dongles, so SoapySDR/HackRF (and other non-RTL-SDR) devices must be declared manually. Create a config file in the add-on config directory that contains its own `device` line with the appropriate device string — for example `hackrf.conf`:
 
 ```
-convert     si
+device    driver=hackrf
+frequency 433.92M
 ```
 
-Assuming you have only one USB dongle attached and rtl_433 is able to automatically find it, we arrive at a minimal rtl_433 config file that looks like this:
+Any config file that does **not** match a detected RTL-SDR radio but **does** contain a `device` line is launched as its own radio. The file name is up to you (it becomes the radio's log label); the `device` line selects the SDR. As with overrides, the file is appended to the internal default (so you do not need to add the `output http://...` line yourself), and the add-on injects the `device` line ahead of the default's output line. These manually-declared radios are launched **after** any auto-detected RTL-SDR dongles and are assigned the next free ports.
 
-```
-output      http://0.0.0.0:${port}
+### Logging
 
-frequency   433.92M
-protocol    40
+Two independent options in the add-on's Configuration tab control what rtl_433 writes to the add-on log:
 
-convert     si
-```
+ - **Log received messages** appends `output kv` to each radio's config, so decoded sensor events appear in the log. Useful for confirming that sensors are being received.
+ - **Log diagnostic messages** appends `output log` to each radio's config, so rtl_433's own status/diagnostic messages appear in the log. Useful for troubleshooting the radios themselves.
 
-Please check [the official rtl_433 documentation](https://triq.org/rtl_433) and [config file examples](https://github.com/merbanan/rtl_433/tree/master/conf) for more information.
+Both default to off and can be enabled independently.
+
+### Breaking change / migration
+
+Earlier versions of this add-on read config files from `/config/rtl_433/` in the **Home Assistant config directory**. That location is **no longer read**. Move any per-radio tuning into `<id>.conf` files in the **add-on config directory** (`/addon_configs/rtl433/`) as described above. There is no longer a separate config file for the default case — the default is baked into the image.
+
+### Limitation
+
+Auto-detection enumerates **RTL-SDR** dongles only (via the kernel's USB device table). Non-RTL-SDR SDRs such as SoapySDR or HackRF devices are **not** auto-detected; run them by declaring each one manually in a config file with its own `device` line, as described in [Non-RTL-SDR radios](#non-rtl-sdr-radios-soapysdr--hackrf) above.
 
 ## Credit
 

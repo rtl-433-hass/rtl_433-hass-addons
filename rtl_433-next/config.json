@@ -7,11 +7,19 @@
   "url": "https://github.com/rtl-433-hass/rtl_433-hass-addons/tree/main/rtl_433-next",
   "arch": ["aarch64", "amd64"],
   "init": false,
-  "map": ["homeassistant_config:rw"],
+  "map": ["addon_config:rw"],
   "usb": true,
   "udev": true,
   "hassio_api": true,
   "discovery": ["rtl_433"],
+  "options": {
+    "log_received_messages": false,
+    "log_diagnostic_messages": false
+  },
+  "schema": {
+    "log_received_messages": "bool",
+    "log_diagnostic_messages": "bool"
+  },
   "ports": {
     "8433/tcp": 8433,
     "8434/tcp": 8434,

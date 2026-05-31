@@ -2,7 +2,7 @@ ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.23
 # hadolint ignore=DL3006
 FROM $BUILD_FROM AS builder
 
-ENV LANG C.UTF-8
+ENV LANG=C.UTF-8
 
 # Copied with minor edits from https://github.com/hertzg/rtl_433_docker/blob/master/images/alpine/build-context/Dockerfile
 # DL3018 (pin apk versions) is ignored on purpose: Alpine removes superseded
@@ -58,7 +58,7 @@ RUN make install
 # hadolint ignore=DL3006
 FROM $BUILD_FROM
 
-ENV LANG C.UTF-8
+ENV LANG=C.UTF-8
 
 # DL3018 (pin apk versions) is ignored on purpose: Alpine removes superseded
 # package versions from its repos, so exact pins break the build as soon as a
@@ -77,6 +77,24 @@ COPY --from=soapy_hackrf_builder /usr/lib /lib-s
 # hadolint ignore=DL3059
 RUN mkdir -p /usr/local/lib/SoapySDR/modules0.8/
 COPY --from=soapy_hackrf_builder /usr/local/lib/SoapySDR/modules0.8/libHackRFSupport.so /usr/local/lib/SoapySDR/modules0.8/
+
+# Default rtl_433 configuration baked into the image
+COPY rtl_433.defaults.conf /etc/rtl_433/rtl_433.defaults.conf
+
+# Append the TPMS protocol disables generated from THIS image's rtl_433. Every
+# decoder whose '-R help' line mentions "TPMS" is disabled, so the disabled set
+# always matches the rtl_433 version built above (protocol numbers shift between
+# releases). 'test -s' fails the build if nothing is generated (e.g. the help
+# format changed), so the default never silently ships with TPMS enabled.
+# DL4006 (pipefail) is not used on purpose: 'rtl_433 -R help' may exit non-zero,
+# and the 'test -s' check is what actually guards the result.
+# hadolint ignore=DL4006
+RUN rtl_433 -R help 2>&1 \
+      | sed -nE 's/^[[:space:]]*\[[[:space:]]*([0-9]+)\][*]?[[:space:]]+.*[Tt][Pp][Mm][Ss].*/protocol -\1/p' \
+      > /tmp/tpms-disables.conf \
+    && test -s /tmp/tpms-disables.conf \
+    && cat /tmp/tpms-disables.conf >> /etc/rtl_433/rtl_433.defaults.conf \
+    && rm -f /tmp/tpms-disables.conf
 
 # Run script
 COPY run.sh /
