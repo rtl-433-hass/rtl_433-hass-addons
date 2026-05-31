@@ -82,7 +82,18 @@ Notes:
 
 For the full list of available directives, see the example config in the rtl_433 source: [rtl_433.example.conf](https://github.com/merbanan/rtl_433/blob/master/conf/rtl_433.example.conf), the [official rtl_433 documentation](https://triq.org/rtl_433), and the supported protocol list in the [rtl_433 README](https://github.com/merbanan/rtl_433/blob/master/README.md).
 
-An override file whose name does not match any detected radio is ignored, and the add-on logs a warning so a typo or an unplugged dongle does not silently do nothing.
+An override file whose name does not match any detected radio **and** does not declare its own `device` line is ignored, and the add-on logs a warning so a typo or an unplugged dongle does not silently do nothing.
+
+### Non-RTL-SDR radios (SoapySDR / HackRF)
+
+Auto-detection only finds **RTL-SDR** dongles, so SoapySDR/HackRF (and other non-RTL-SDR) devices must be declared manually. Create a config file in the add-on config directory that contains its own `device` line with the appropriate device string — for example `hackrf.conf`:
+
+```
+device    driver=hackrf
+frequency 433.92M
+```
+
+Any config file that does **not** match a detected RTL-SDR radio but **does** contain a `device` line is launched as its own radio. The file name is up to you (it becomes the radio's log label); the `device` line selects the SDR. As with overrides, the file is appended to the internal default (so you do not need to add the `output http://...` line yourself), and the add-on injects the `device` line ahead of the default's output line. These manually-declared radios are launched **after** any auto-detected RTL-SDR dongles and are assigned the next free ports.
 
 ### Logging
 
@@ -99,7 +110,7 @@ Earlier versions of this add-on read config files from `/config/rtl_433/` in the
 
 ### Limitation
 
-Auto-detection enumerates **RTL-SDR** dongles only (via the kernel's USB device table). Non-RTL-SDR SDRs such as SoapySDR or HackRF devices are **not** auto-detected and will not be launched by this add-on.
+Auto-detection enumerates **RTL-SDR** dongles only (via the kernel's USB device table). Non-RTL-SDR SDRs such as SoapySDR or HackRF devices are **not** auto-detected; run them by declaring each one manually in a config file with its own `device` line, as described in [Non-RTL-SDR radios](#non-rtl-sdr-radios-soapysdr--hackrf) above.
 
 ## Credit
 
