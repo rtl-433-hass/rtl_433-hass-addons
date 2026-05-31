@@ -81,20 +81,25 @@ COPY --from=soapy_hackrf_builder /usr/local/lib/SoapySDR/modules0.8/libHackRFSup
 # Default rtl_433 configuration baked into the image
 COPY rtl_433.defaults.conf /etc/rtl_433/rtl_433.defaults.conf
 
-# Append the TPMS protocol disables generated from THIS image's rtl_433. Every
-# decoder whose '-R help' line mentions "TPMS" is disabled, so the disabled set
-# always matches the rtl_433 version built above (protocol numbers shift between
-# releases). 'test -s' fails the build if nothing is generated (e.g. the help
-# format changed), so the default never silently ships with TPMS enabled.
+# Generate the TPMS protocol disables from THIS image's rtl_433 into a separate
+# file. Every decoder whose '-R help' line mentions "TPMS" is disabled, so the
+# disabled set always matches the rtl_433 version built above (protocol numbers
+# shift between releases). The file is kept separate from the default config so
+# run.sh can append it conditionally based on the 'disable_tpms' add-on option;
+# when the option is off the disables are simply never appended. 'test -s' fails
+# the build if nothing is generated (e.g. the help format changed), so the file
+# is never silently empty.
 # DL4006 (pipefail) is not used on purpose: 'rtl_433 -R help' may exit non-zero,
 # and the 'test -s' check is what actually guards the result.
 # hadolint ignore=DL4006
-RUN rtl_433 -R help 2>&1 \
+RUN { echo "# TPMS protocol disables generated at image build time from"; \
+      echo "# 'rtl_433 -R help'. Appended per-radio by run.sh when the"; \
+      echo "# 'disable_tpms' add-on option is enabled. Not user-editable."; \
+    } > /etc/rtl_433/rtl_433.tpms-disables.conf \
+    && rtl_433 -R help 2>&1 \
       | sed -nE 's/^[[:space:]]*\[[[:space:]]*([0-9]+)\][*]?[[:space:]]+.*[Tt][Pp][Mm][Ss].*/protocol -\1/p' \
-      > /tmp/tpms-disables.conf \
-    && test -s /tmp/tpms-disables.conf \
-    && cat /tmp/tpms-disables.conf >> /etc/rtl_433/rtl_433.defaults.conf \
-    && rm -f /tmp/tpms-disables.conf
+      >> /etc/rtl_433/rtl_433.tpms-disables.conf \
+    && grep -q '^protocol -' /etc/rtl_433/rtl_433.tpms-disables.conf
 
 # Run script
 COPY run.sh /

@@ -10,6 +10,10 @@ conf_directory="/config"
 # per-radio override file.
 default_conf="/etc/rtl_433/rtl_433.defaults.conf"
 
+# TPMS protocol disables generated at image build time (see Dockerfile). Appended
+# to each rendered config only when the 'disable_tpms' add-on option is enabled.
+tpms_disables_conf="/etc/rtl_433/rtl_433.tpms-disables.conf"
+
 # Directory the rendered, ready-to-run config files are written to. Kept under
 # /tmp so nothing is ever written into the user-visible config directory.
 render_dir="/tmp/rtl_433"
@@ -158,6 +162,16 @@ radio_match_id() {
     printf '%s' "$raw" | tr -c 'A-Za-z0-9:._-' '_'
 }
 
+# Read the "Disable TPMS sensors" add-on option (default on). When true, the
+# build-time-generated TPMS 'protocol -N' disables are appended to every radio's
+# rendered config. When false, no disables are appended, so every decoder
+# rtl_433 ships is enabled.
+disable_tpms="false"
+if bashio::config.true 'disable_tpms'
+then
+    disable_tpms="true"
+fi
+
 # Read the "Log received messages" add-on option. When true, 'output kv' is
 # appended to every radio's rendered config so decoded events show in the log.
 log_received_messages="false"
@@ -216,6 +230,11 @@ launch_radio() {
     {
         [ -n "$device_line" ] && echo "$device_line"
         cat "$default_conf"
+        if [ "$disable_tpms" = "true" ] && [ -f "$tpms_disables_conf" ]
+        then
+            echo
+            cat "$tpms_disables_conf"
+        fi
         if [ -n "$override_file" ] && [ -f "$override_file" ]
         then
             echo
