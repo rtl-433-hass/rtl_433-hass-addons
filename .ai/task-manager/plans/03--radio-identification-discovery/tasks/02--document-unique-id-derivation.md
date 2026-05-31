@@ -2,7 +2,7 @@
 id: 2
 group: "radio-identification"
 dependencies: [1]
-status: "pending"
+status: "completed"
 created: 2026-05-31
 skills:
   - technical-writing

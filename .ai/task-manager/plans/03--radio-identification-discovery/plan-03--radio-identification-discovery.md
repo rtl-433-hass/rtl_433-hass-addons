@@ -200,9 +200,9 @@ graph TD
 **Parallel Tasks:**
 - ✔️ Task 001: Implement sysfs enumeration, layered identifier resolver, launch-loop wiring, and `unique_id` discovery payload in `rtl_433/run.sh` (status: completed)
 
-### Phase 2: Documentation
+### ✅ Phase 2: Documentation
 **Parallel Tasks:**
-- Task 002: Document the `unique_id` derivation in `rtl_433/README.md` (depends on: 001)
+- ✔️ Task 002: Document the `unique_id` derivation in `rtl_433/README.md` (depends on: 001) (status: completed)
 
 ### Post-phase Actions
 - After each phase, run the POST_PHASE validation gate (`pre-commit run --all-files`, shellcheck/hadolint, and the task's own validation steps).
