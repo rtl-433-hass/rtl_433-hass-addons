@@ -41,6 +41,11 @@ RADIO_HEALTHY_UPTIME=60
 # be exercised against a mock tree in tests.
 SYSFS_USB_BASE="${SYSFS_USB_BASE:-/sys/bus/usb/devices}"
 
+# Per-add-on persistent storage (the always-present '/data' volume). Used to
+# remember the Supervisor discovery message's uuid across restarts so a later
+# run with no radios can delete it. Overridable so tests can use a temp dir.
+DATA_DIR="${DATA_DIR:-/data}"
+
 # Known RTL-SDR USB VID:PID identifiers (from librtlsdr's known-device table),
 # stored space-padded so a membership test is a simple glob. Used to pick out
 # RTL-SDR dongles while enumerating sysfs.
@@ -463,35 +468,45 @@ main() {
             return 0
         fi
 
-        local i port tag uid body http_code
+        local i port tag uid body response http_code resp_body msg_uuid published_uuid=""
         for i in "${!radio_ports[@]}"
         do
             port="${radio_ports[$i]}"
             tag="${radio_tags[$i]}"
             uid="${radio_unique_ids[$i]}"
 
-            # Build the discovery payload with printf (jq is not in the runtime
-            # image). 'service' MUST equal the discovery entry in config.json
-            # ("rtl_433"). The integration connects to ws://<host>:<port>/ws and uses
-            # 'unique_id' as a stable per-radio key. host/port are interpolated; the
-            # unique_id is pre-sanitised to a JSON-safe character set by
-            # resolve_radio_unique_id, so no further JSON escaping is needed.
+            # Build the discovery payload with printf (parsed with sed below, to
+            # match how the Supervisor JSON is handled elsewhere here). 'service'
+            # MUST equal the discovery entry in config.json ("rtl_433"). The
+            # integration connects to ws://<host>:<port>/ws and uses 'unique_id' as
+            # a stable per-radio key. host/port are interpolated; the unique_id is
+            # pre-sanitised to a JSON-safe character set by resolve_radio_unique_id,
+            # so no further JSON escaping is needed.
             printf -v body \
                 '{"service": "rtl_433", "config": {"host": "%s", "port": %s, "path": "/ws", "secure": false, "unique_id": "%s"}}' \
                 "$host" "$port" "$uid"
 
-            # Best-effort POST. Capture the HTTP status separately from the body so
-            # a non-2xx response or a curl failure is logged but never aborts the
-            # script. -o /dev/null discards the response body.
-            http_code="$(curl -s -o /dev/null -w '%{http_code}' \
+            # Best-effort POST. Capture the response body and the HTTP status (the
+            # latter appended on its own trailing line) so a non-2xx response or a
+            # curl failure is logged but never aborts the script. The body carries
+            # the message uuid, which we persist so a later run with no radios can
+            # delete the message.
+            response="$(curl -s -w $'\n%{http_code}' \
                 -X POST \
                 -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
                 -H "Content-Type: application/json" \
                 -d "$body" \
-                "http://supervisor/discovery" 2>/dev/null)" || http_code="000"
+                "http://supervisor/discovery" 2>/dev/null)" || response=$'\n000'
+            http_code="${response##*$'\n'}"
+            resp_body="${response%$'\n'*}"
 
             if [[ "$http_code" =~ ^2 ]]
             then
+                # All radios share one Supervisor discovery message (equality is
+                # add-on + service, so each POST overwrites the same message and
+                # returns the same uuid); remember it for cleanup.
+                msg_uuid="$(printf '%s' "$resp_body" | sed -n 's/.*"uuid"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+                [ -n "$msg_uuid" ] && published_uuid="$msg_uuid"
                 bashio::log.info "Published discovery for radio '${tag}' on port ${port} (HTTP ${http_code})."
             else
                 # The Supervisor may reject the 'rtl_433' service until the
@@ -500,9 +515,62 @@ main() {
                 bashio::log.warning "Discovery publication for radio '${tag}' on port ${port} returned HTTP ${http_code} (non-fatal; Supervisor may reject the service until the integration supports discovery)."
             fi
         done
+
+        # Persist the discovery message uuid so a later boot with no radios can
+        # delete it (see remove_discovery_state). Best-effort: a write failure is
+        # logged but never fatal.
+        if [ -n "$published_uuid" ]
+        then
+            printf '%s' "$published_uuid" > "${DATA_DIR}/discovery.uuid" 2>/dev/null \
+                || bashio::log.warning "Could not persist discovery uuid to ${DATA_DIR}/discovery.uuid."
+        fi
     }
 
-    publish_discovery
+    # Remove a previously-published discovery message when this run has no radios
+    # to advertise (e.g. the last/only dongle was unplugged), so Home Assistant
+    # stops trying to reach a radio that is no longer present. All radios share a
+    # single Supervisor discovery message (keyed by add-on + 'rtl_433' service),
+    # so there is at most one uuid to delete, remembered in DATA_DIR by
+    # publish_discovery. Best-effort: any failure is logged and ignored.
+    remove_discovery_state() {
+        if [ -z "${SUPERVISOR_TOKEN:-}" ]
+        then
+            return 0
+        fi
+
+        local state="${DATA_DIR}/discovery.uuid" uuid http_code
+        [ -f "$state" ] || return 0
+        uuid="$(cat "$state" 2>/dev/null)"
+        if [ -z "$uuid" ]
+        then
+            rm -f "$state"
+            return 0
+        fi
+
+        http_code="$(curl -s -o /dev/null -w '%{http_code}' \
+            -X DELETE \
+            -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+            "http://supervisor/discovery/${uuid}" 2>/dev/null)" || http_code="000"
+
+        if [[ "$http_code" =~ ^2 ]]
+        then
+            bashio::log.info "Removed stale rtl_433 discovery message (uuid ${uuid}, HTTP ${http_code}); no radios are running."
+        else
+            # A 404 just means the message was already gone (e.g. the Supervisor
+            # purged it); either way the local state is cleared below.
+            bashio::log.warning "Removal of stale discovery uuid ${uuid} returned HTTP ${http_code} (non-fatal)."
+        fi
+        rm -f "$state"
+    }
+
+    # Advertise the running radios, or clean up a leftover discovery message when
+    # there are none.
+    if [ "${#radio_ports[@]}" -gt 0 ]
+    then
+        publish_discovery
+    else
+        remove_discovery_state
+    fi
 
     # Block until shutdown. Each supervisor restarts its own rtl_433, so under
     # normal operation the supervisor PIDs never exit and the add-on stays up; a
