@@ -3,6 +3,26 @@
 * Update Alpine base to 3.21
 * Update the stable addon to rtl_433 25.02
 
+## [0.2.0](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.1.0...v0.2.0) (2026-06-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* **rtl_433:** configuration moves from the Home Assistant config directory (/config/rtl_433) to the add-on's own config directory (/addon_configs/rtl433/). The old location is no longer read, and users no longer author full config files -- only optional per-radio overrides.
+* **rtl_433:** MQTT output, the retain option, and the rtl_433_conf_file option are removed. Configurations must use rtl_433 HTTP output and the rtl_433 Home Assistant integration.
+
+### Features
+
+* **rtl_433:** add a 'disable_tpms' option to toggle TPMS decoders ([71670ab](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/71670ab2f0c0e46f8f576568cefde991702ff89f))
+* **rtl_433:** add a 'Log diagnostic messages' option for output log ([d4d5054](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/d4d5054b136857314e7bad99e08d9b2df467f84f))
+* **rtl_433:** advertise a stable per-radio unique_id in discovery ([#66](https://github.com/rtl-433-hass/rtl_433-hass-addons/issues/66)) ([c0a4c65](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/c0a4c65da06acdb14dd3ba9484c257d7853a58c5))
+* **rtl_433:** auto-detect dongles and append per-radio overrides ([395e1ce](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/395e1ce5d0dd9cdf8d7ba808e9286810b7da0b8a))
+* **rtl_433:** expose radios over HTTP instead of MQTT ([be095a9](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/be095a993a37da2cc9cb0ecc7d51414252946182))
+* **rtl_433:** publish radios to Supervisor discovery API ([3b695bc](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/3b695bcb057bb3d68ad72e4587e80eb30ec2b007))
+* **rtl_433:** render config via literal {{port}} substitution instead of bash ([7c64d65](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/7c64d6549ba3002843f568a3960a6a97915d5159))
+* **rtl_433:** store config in the add-on config dir and add log option ([05bcfb9](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/05bcfb9dd51f621ad4319ac9feaa2899a3d8d08e))
+* **rtl_433:** support manually-declared SoapySDR/HackRF radios ([9507a2d](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/9507a2d6495637f68e82e65ce607f8c8b8b0b73f))
+
 ## [0.1.0](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.0.1...v0.1.0) (2026-05-30)
 
 
