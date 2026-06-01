@@ -27,6 +27,16 @@ BASE_PORT=8433
 # beyond this count are skipped.
 MAX_RADIOS=10
 
+# Restart-backoff bounds (seconds) for a supervised radio. A crashed/failed
+# rtl_433 is restarted after RADIO_RESTART_MIN_DELAY, doubling on each repeated
+# quick failure up to RADIO_RESTART_MAX_DELAY. A run that stays up at least
+# RADIO_HEALTHY_UPTIME seconds resets the backoff to the minimum, so a one-off
+# crash recovers immediately while a hard failure (e.g. a permanently busy or
+# unplugged dongle) backs off instead of hammering in a tight loop.
+RADIO_RESTART_MIN_DELAY=2
+RADIO_RESTART_MAX_DELAY=60
+RADIO_HEALTHY_UPTIME=60
+
 # Base sysfs path for USB device enumeration. Overridable so the enumeration can
 # be exercised against a mock tree in tests.
 SYSFS_USB_BASE="${SYSFS_USB_BASE:-/sys/bus/usb/devices}"
@@ -162,6 +172,44 @@ radio_match_id() {
     printf '%s' "$raw" | tr -c 'A-Za-z0-9:._-' '_'
 }
 
+# Supervise a single radio: run its rtl_433 in a restart loop so a single
+# device failure (USB busy, dongle unplugged, decoder crash) only restarts that
+# radio rather than taking down the whole add-on. Uses exponential backoff
+# (capped at RADIO_RESTART_MAX_DELAY) for repeated quick failures, reset once a
+# run stays up at least RADIO_HEALTHY_UPTIME seconds. Intended to run in a
+# background subshell whose stdout/stderr are '[tag]'-prefixed by the caller, so
+# it loops forever; the add-on stays alive as long as any radio is supervised.
+# rtl_433 is run in the background and waited on so a shutdown signal interrupts
+# the wait promptly; the trap forwards SIGTERM to it for a clean stop.
+# Args: <tag> <live_config_path>.
+supervise_radio() {
+    local tag="$1" live="$2"
+    local delay="$RADIO_RESTART_MIN_DELAY" start uptime code child=""
+    trap 'kill -TERM "$child" 2>/dev/null; exit 0' TERM INT
+    while true
+    do
+        start="$SECONDS"
+        rtl_433 -c "$live" &
+        child="$!"
+        wait "$child"
+        code="$?"
+        uptime=$(( SECONDS - start ))
+        # A run that stayed healthy resets the backoff; repeated quick failures
+        # let it grow toward the cap.
+        if [ "$uptime" -ge "$RADIO_HEALTHY_UPTIME" ]
+        then
+            delay="$RADIO_RESTART_MIN_DELAY"
+        fi
+        echo "rtl_433 exited (status ${code}, ran ${uptime}s); restarting in ${delay}s." >&2
+        # Interruptible sleep so a shutdown signal during the backoff is handled
+        # immediately rather than after the full delay.
+        sleep "$delay" &
+        wait "$!"
+        delay=$(( delay * 2 ))
+        [ "$delay" -gt "$RADIO_RESTART_MAX_DELAY" ] && delay="$RADIO_RESTART_MAX_DELAY"
+    done
+}
+
 # Run the add-on: read options, enumerate radios, launch rtl_433 per radio,
 # publish discovery, then block. Defined as a function so the file can be sourced
 # (e.g. by BATS tests) to load the pure helpers above without executing any of
@@ -214,6 +262,12 @@ main() {
     matched_ids=" "
 
     rtl_433_pids=()
+
+    # Forward shutdown signals to the radio supervisors so each rtl_433 gets a
+    # clean SIGTERM (and the supervisors stop looping) instead of being
+    # SIGKILLed when the container stops.
+    shutting_down="false"
+    trap 'shutting_down="true"; [ "${#rtl_433_pids[@]}" -gt 0 ] && kill -TERM "${rtl_433_pids[@]}" 2>/dev/null' TERM INT
 
     # Render one radio's config from the baked-in default and launch rtl_433 for it.
     # Args:
@@ -269,7 +323,9 @@ main() {
         sed -e "s|{{port}}|$port|g" -e "s|[$]{port}|$port|g" "${live}.raw" > "$live"
 
         echo "Starting rtl_433 with $live..."
-        rtl_433 -c "$live" > >(sed -u "s/^/[$tag] /") 2> >(>&2 sed -u "s/^/[$tag] /")&
+        # Run under a per-radio restart loop so this radio failing (e.g. its
+        # dongle is busy or unplugged) does not stop the others or the add-on.
+        supervise_radio "$tag" "$live" > >(sed -u "s/^/[$tag] /") 2> >(>&2 sed -u "s/^/[$tag] /")&
         rtl_433_pids+=("$!")
 
         radio_ports+=("$port")
@@ -448,15 +504,32 @@ main() {
 
     publish_discovery
 
-    # Block on the radios. With no radios launched there is nothing to wait on, so
-    # sleep indefinitely to keep the add-on container alive (and restartable) rather
-    # than exiting immediately.
+    # Block until shutdown. Each supervisor restarts its own rtl_433, so under
+    # normal operation the supervisor PIDs never exit and the add-on stays up; a
+    # single failing radio no longer brings the container down. A trap firing
+    # during 'wait' makes it return early, so re-wait until shutdown is signalled.
+    # With no radios launched there is nothing to supervise, so idle to keep the
+    # container alive (and restartable) rather than exiting immediately.
     if [ "${#rtl_433_pids[@]}" -gt 0 ]
     then
-        wait -n "${rtl_433_pids[@]}"
+        while [ "$shutting_down" != "true" ]
+        do
+            wait "${rtl_433_pids[@]}"
+            if [ "$shutting_down" != "true" ]
+            then
+                # 'wait' returned without a shutdown signal: every supervisor
+                # exited unexpectedly. Idle (kept restartable) rather than
+                # busy-looping on already-dead PIDs.
+                bashio::log.warning "All radio supervisors exited unexpectedly; idling."
+                sleep infinity & wait "$!"
+            fi
+        done
     else
         bashio::log.info "No radios running; idling."
-        sleep infinity
+        while [ "$shutting_down" != "true" ]
+        do
+            sleep infinity & wait "$!"
+        done
     fi
 }
 
