@@ -205,3 +205,29 @@ After each phase, run the validation gate in `/config/hooks/POST_PHASE.md` (lint
 ### Execution Summary
 - Total Phases: 4
 - Total Tasks: 5
+
+## Execution Summary
+
+**Status**: ✅ Completed Successfully
+**Completed Date**: 2026-06-01
+
+### Results
+Delivered a dependency-light automated test suite for the `rtl_433` add-on, superseding PR #42, across 5 tasks / 4 phases:
+
+- **`rtl_433/run.sh` (Phase 1)**: wrapped the executable body in a `main()` function invoked only via an `if [ "${BASH_SOURCE[0]}" = "$0" ]` guard. The four pure helpers (`enumerate_rtlsdr_devices`, `_serial_is_usable`, `resolve_radio_unique_id`, `radio_match_id`) remain at top level and are now sourceable. Verified behavior-preserving: the diff is purely the wrap + one indent level; `bash -n` passes and sourcing produces no side effects.
+- **`tests/config/validate_configs.py` (Phase 1)**: standard-library validator for both add-ons — required fields, arch coverage, `ghcr.io` image, semver/`next` version, `build_from` per arch, schema↔options consistency, the exact 8433–8442 ports map, and `discovery`/`hassio_api`/`usb`/`udev` flags. Exits 0 on the repo; exits 1 with a clear message on drift (verified both ways).
+- **`tests/rtl_433/test_run.bats` (Phase 2)**: 11 BATS tests sourcing the real `run.sh`, exercising the detection/identifier logic via the `SYSFS_USB_BASE` mock-sysfs seam. Plain assertions only — no submodules, no `bashio` mock. All green via `bats -r tests/`.
+- **CI workflows (Phase 3)**: `unit-tests.yml` (`bats -r tests/`), `smoke-tests.yml` (image build + binary/help/baked-in-conf checks), `config-validation.yml` (validator). Repo-standard `actions/checkout@de0fac2e…` pin, no new third-party actions; actionlint passes; matches the existing single-concern workflow house style.
+- **Docs (Phase 4)**: rewrote the `AGENTS.md` Testing section (reflected in `CLAUDE.md` via symlink) and added `tests/README.md`.
+
+No git submodules, coverage tooling, or pre-commit BATS hook were introduced (deliberately dropped from #42's approach).
+
+### Noteworthy Events
+- **bats recursion gotcha**: bats 1.11 does not recurse into `tests/rtl_433/` with `bats tests/` (it reports 0 tests and a vacuous pass). The runner command is `bats -r tests/`; the task 4/5 specs and all docs/workflows were corrected to use `-r`.
+- **shellcheck on the `.bats` file**: pre-commit's shellcheck lints `tests/rtl_433/test_run.bats` and raised SC1090 (dynamic `source`) and SC2034 (arrays read by sourced functions). Resolved with a documented file-level `# shellcheck disable=SC1090,SC2034` directive — these are false positives for test code.
+- **Unrelated end-of-file-fixer churn**: the hook repeatedly wanted to add trailing newlines to three pre-existing task-manager framework files (`.ai/.../POST_PHASE.md`, `.ai/.../.init-metadata.json`, `.claude/agents/plan-creator.md`). These were reverted each time to keep commits scoped to the testing work.
+- **Smoke-test build not run locally**: the `docker build` of `./rtl_433` compiles rtl_433 + SoapySDR/HackRF from source (minutes) and was intentionally not executed locally; it is exercised by the `smoke-tests.yml` workflow on PR/push. Self-validation step 6 is therefore covered by CI rather than locally.
+
+### Necessary follow-ups
+- **Maintainer action**: close/merge GitHub PR #42 once this branch lands (intentionally out of scope for automated execution).
+- Open a PR from `feature/5--automated-testing-suite` (PR title = first commit subject: "test(rtl_433): add sourceable run.sh guard and config validator") so the three new workflows run on the PR and the smoke build is exercised.
