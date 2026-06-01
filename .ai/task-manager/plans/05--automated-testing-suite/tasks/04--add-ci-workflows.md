@@ -2,7 +2,7 @@
 id: 4
 group: "ci"
 dependencies: [2, 3]
-status: "pending"
+status: "completed"
 created: 2026-06-01
 skills:
   - github-actions

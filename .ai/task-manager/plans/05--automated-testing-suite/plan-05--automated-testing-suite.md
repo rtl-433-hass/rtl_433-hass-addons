@@ -191,9 +191,9 @@ graph TD
 **Parallel Tasks:**
 - ✔️ Task 002: Write fresh BATS unit tests for the `run.sh` functions (depends on: 001)
 
-### Phase 3: CI Wiring
+### ✅ Phase 3: CI Wiring
 **Parallel Tasks:**
-- Task 004: Add the three CI workflows (depends on: 002, 003)
+- ✔️ Task 004: Add the three CI workflows (depends on: 002, 003)
 
 ### Phase 4: Documentation
 **Parallel Tasks:**
