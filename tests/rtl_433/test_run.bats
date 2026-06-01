@@ -7,13 +7,15 @@
 #
 # run.sh has a main()-guard, so sourcing it under plain bash defines the helper
 # functions without executing the add-on body. These tests exercise the custom
-# logic: sysfs enumeration, serial usability, the unique-id fallback ladder, and
-# the raw match-id derivation. Uses only plain BATS assertions.
+# logic: sysfs enumeration, serial usability, the unique-id fallback ladder, the
+# raw match-id derivation, and the Supervisor discovery uuid persistence/cleanup.
+# Uses only plain BATS assertions.
 
 setup() {
     RUN_SH="${BATS_TEST_DIRNAME}/../../rtl_433/run.sh"
     # Source for function definitions only; the main-guard prevents the body
-    # from running. These helpers never call bashio, so no mock is needed.
+    # from running. The enumeration/identifier helpers never call bashio; the
+    # discovery tests stub bashio/curl themselves (see discovery_mocks).
     source "$RUN_SH"
 }
 
@@ -123,4 +125,101 @@ make_usb_dev() {
     run radio_match_id "00000000" "1-1.4"
     [ "$status" -eq 0 ]
     [ "$output" = "1-1.4" ]
+}
+
+# --- parse_discovery_uuid ----------------------------------------------------
+
+@test "parse_discovery_uuid extracts the uuid from a POST /discovery response" {
+    run parse_discovery_uuid '{"result":"ok","data":{"uuid":"abc123DEF456"}}'
+    [ "$status" -eq 0 ]
+    [ "$output" = "abc123DEF456" ]
+}
+
+@test "parse_discovery_uuid emits nothing when the body carries no uuid" {
+    run parse_discovery_uuid '{"result":"error","message":"bad service"}'
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+# --- save_discovery_uuid / remove_discovery_state ----------------------------
+
+# Stub the Supervisor-facing dependencies: bashio logging is silenced and curl
+# records its arguments to $CURL_LOG and prints $MOCK_HTTP_CODE (mimicking
+# 'curl -w %{http_code}' with the response body discarded via -o /dev/null). The
+# stubs and variables are inherited by the subshell that 'run' forks. DATA_DIR is
+# pointed at a per-test temp dir; the discovery helpers read it at call time.
+discovery_mocks() {
+    DATA_DIR="$BATS_TEST_TMPDIR/data"
+    mkdir -p "$DATA_DIR"
+    CURL_LOG="$BATS_TEST_TMPDIR/curl.log"
+    : > "$CURL_LOG"
+    MOCK_HTTP_CODE="200"
+    bashio::log.info()    { :; }
+    bashio::log.warning() { :; }
+    curl() { printf '%s\n' "$*" >> "$CURL_LOG"; printf '%s' "$MOCK_HTTP_CODE"; }
+}
+
+@test "save_discovery_uuid writes the uuid under DATA_DIR" {
+    discovery_mocks
+    run save_discovery_uuid "uuid-xyz"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$DATA_DIR/discovery.uuid")" = "uuid-xyz" ]
+}
+
+@test "save_discovery_uuid is a no-op for an empty uuid" {
+    discovery_mocks
+    run save_discovery_uuid ""
+    [ "$status" -eq 0 ]
+    [ ! -e "$DATA_DIR/discovery.uuid" ]
+}
+
+@test "save+remove round-trip: persisted uuid is DELETEd and the state cleared" {
+    SUPERVISOR_TOKEN="tok"
+    discovery_mocks
+    save_discovery_uuid "uuid-123"
+    MOCK_HTTP_CODE="200"
+    run remove_discovery_state
+    [ "$status" -eq 0 ]
+    grep -q -- "-X DELETE" "$CURL_LOG"
+    grep -q "http://supervisor/discovery/uuid-123" "$CURL_LOG"
+    [ ! -e "$DATA_DIR/discovery.uuid" ]
+}
+
+@test "remove_discovery_state clears local state even on a non-2xx (already gone)" {
+    SUPERVISOR_TOKEN="tok"
+    discovery_mocks
+    save_discovery_uuid "uuid-404"
+    MOCK_HTTP_CODE="404"
+    run remove_discovery_state
+    [ "$status" -eq 0 ]
+    grep -q "http://supervisor/discovery/uuid-404" "$CURL_LOG"
+    [ ! -e "$DATA_DIR/discovery.uuid" ]
+}
+
+@test "remove_discovery_state is a no-op when no state file exists" {
+    SUPERVISOR_TOKEN="tok"
+    discovery_mocks
+    run remove_discovery_state
+    [ "$status" -eq 0 ]
+    [ ! -s "$CURL_LOG" ]   # curl never called
+}
+
+@test "remove_discovery_state clears an empty state file without calling curl" {
+    SUPERVISOR_TOKEN="tok"
+    discovery_mocks
+    : > "$DATA_DIR/discovery.uuid"
+    run remove_discovery_state
+    [ "$status" -eq 0 ]
+    [ ! -s "$CURL_LOG" ]
+    [ ! -e "$DATA_DIR/discovery.uuid" ]
+}
+
+@test "remove_discovery_state skips entirely without a Supervisor token" {
+    unset SUPERVISOR_TOKEN
+    discovery_mocks
+    save_discovery_uuid "uuid-x"
+    run remove_discovery_state
+    [ "$status" -eq 0 ]
+    [ ! -s "$CURL_LOG" ]                   # curl never called
+    [ -e "$DATA_DIR/discovery.uuid" ]      # state left untouched
 }
