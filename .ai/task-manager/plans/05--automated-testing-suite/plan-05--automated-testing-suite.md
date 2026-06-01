@@ -187,9 +187,9 @@ graph TD
 - ✔️ Task 001: Add a source-guard (`main`) to `rtl_433/run.sh`
 - ✔️ Task 003: Create the add-on config validator `tests/config/validate_configs.py`
 
-### Phase 2: Unit Tests
+### ✅ Phase 2: Unit Tests
 **Parallel Tasks:**
-- Task 002: Write fresh BATS unit tests for the `run.sh` functions (depends on: 001)
+- ✔️ Task 002: Write fresh BATS unit tests for the `run.sh` functions (depends on: 001)
 
 ### Phase 3: CI Wiring
 **Parallel Tasks:**

@@ -2,7 +2,7 @@
 id: 2
 group: "testing-infrastructure"
 dependencies: [1]
-status: "pending"
+status: "completed"
 created: 2026-06-01
 skills:
   - bats

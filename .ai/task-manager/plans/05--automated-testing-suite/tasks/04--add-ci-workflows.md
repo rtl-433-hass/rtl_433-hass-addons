@@ -16,7 +16,7 @@ Wire the test suite into CI with three small, single-concern workflow files matc
 - `github-actions` — workflow YAML, runners, pinned action references.
 
 ## Acceptance Criteria
-- [ ] `.github/workflows/unit-tests.yml`: checkout, install `bats` (`sudo apt-get update && sudo apt-get install -y bats`), run `bats tests/`.
+- [ ] `.github/workflows/unit-tests.yml`: checkout, install `bats` (`sudo apt-get update && sudo apt-get install -y bats`), run `bats -r tests/` (the `-r` is required — bats 1.11 does not recurse into `tests/rtl_433/` without it).
 - [ ] `.github/workflows/smoke-tests.yml`: checkout, `docker build` the `rtl_433` image, then assert the binary works and the baked-in config files exist (see notes).
 - [ ] `.github/workflows/config-validation.yml`: checkout, run `python3 tests/config/validate_configs.py` using the runner's system Python (no `setup-python`, no `pip install`).
 - [ ] All three use `actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6` (the repo standard) and introduce no other third-party actions.
@@ -59,7 +59,7 @@ jobs:
       - name: Install bats
         run: sudo apt-get update && sudo apt-get install -y bats
       - name: Run BATS tests
-        run: bats tests/
+        run: bats -r tests/
 ```
 
 **`smoke-tests.yml`:** build the real image, then assert. `rtl_433 --help` exits non-zero by design, so capture output and grep a stable token.

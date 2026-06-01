@@ -39,7 +39,7 @@ Markdown only. Note that pre-commit still runs the linters; the new test suite r
 1. **`AGENTS.md` "Testing" section.** It currently reads roughly: "Rely on pre-commit hooks to run all checks automatically." Replace/expand it to something like:
    - Pre-commit hooks still run the linters (shellcheck, hadolint, actionlint, yaml/json) automatically.
    - Automated tests run in CI on every push/PR and can be run locally:
-     - Unit tests (BATS) for `rtl_433/run.sh` helper functions: `bats tests/`
+     - Unit tests (BATS) for `rtl_433/run.sh` helper functions: `bats -r tests/`
      - Container smoke test: build `./rtl_433` and check the binary + baked-in configs (see `.github/workflows/smoke-tests.yml`).
      - Config validation: `python3 tests/config/validate_configs.py`
    - Note that `run.sh` is `main`-guarded so its functions can be sourced by tests.
@@ -47,7 +47,7 @@ Markdown only. Note that pre-commit still runs the linters; the new test suite r
 
 2. **`tests/README.md`** — short, e.g.:
    - Layout: `tests/rtl_433/test_run.bats` (BATS unit tests), `tests/config/validate_configs.py` (config validator).
-   - Running: `bats tests/` and `python3 tests/config/validate_configs.py`.
+   - Running: `bats -r tests/` and `python3 tests/config/validate_configs.py`.
    - Fixture convention: the BATS tests build a mock sysfs tree and point `SYSFS_USB_BASE` at it to exercise `enumerate_rtlsdr_devices` without real hardware.
    - Prerequisites: `bats` (install via `apt-get install -y bats` or `bats-core`); Python 3 standard library only.
 
