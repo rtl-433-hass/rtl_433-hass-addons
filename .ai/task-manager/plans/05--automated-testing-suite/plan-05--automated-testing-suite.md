@@ -182,10 +182,10 @@ graph TD
     004 --> 005
 ```
 
-### Phase 1: Foundations (no dependencies)
+### ✅ Phase 1: Foundations (no dependencies)
 **Parallel Tasks:**
-- Task 001: Add a source-guard (`main`) to `rtl_433/run.sh`
-- Task 003: Create the add-on config validator `tests/config/validate_configs.py`
+- ✔️ Task 001: Add a source-guard (`main`) to `rtl_433/run.sh`
+- ✔️ Task 003: Create the add-on config validator `tests/config/validate_configs.py`
 
 ### Phase 2: Unit Tests
 **Parallel Tasks:**
