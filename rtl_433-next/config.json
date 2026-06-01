@@ -3,6 +3,7 @@
   "image": "ghcr.io/rtl-433-hass/rtl_433-next",
   "version": "next",
   "slug": "rtl433-next",
+  "stage": "experimental",
   "description": "Receive wireless sensor data via an SDR dongle and rtl_433",
   "url": "https://github.com/rtl-433-hass/rtl_433-hass-addons/tree/main/rtl_433-next",
   "arch": ["aarch64", "amd64"],
