@@ -3,6 +3,19 @@
 * Update Alpine base to 3.21
 * Update the stable addon to rtl_433 25.02
 
+## [0.3.0](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.2.0...v0.3.0) (2026-06-01)
+
+
+### Features
+
+* add rtl_433 brand icon and logo to both add-ons ([6583ad8](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/6583ad8b6e03e6e0f909c69e9030af9c4955a232))
+* **rtl_433:** remove stale Supervisor discovery when no radios are present ([#73](https://github.com/rtl-433-hass/rtl_433-hass-addons/issues/73)) ([6091519](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/6091519e5125f34e0a7addda406f4d1e8f3abf8b))
+
+
+### Bug Fixes
+
+* **rtl_433:** supervise each radio so one failure doesn't stop the add-on ([554cc81](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/554cc81c40701bc51aac1e78302f73b7508e8043))
+
 ## [0.2.0](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.1.0...v0.2.0) (2026-06-01)
 
 
