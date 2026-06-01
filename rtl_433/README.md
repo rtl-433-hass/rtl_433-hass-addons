@@ -84,10 +84,10 @@ convert   si
 
 Notes:
 
- - The default already provides `output http://0.0.0.0:${port}`, so **do not add an `output http://...` line yourself**; the `${port}` placeholder is filled in with the radio's assigned port automatically.
+ - The default already provides `output http://0.0.0.0:{{port}}`, so **do not add an `output http://...` line yourself**; the `{{port}}` placeholder is filled in with the radio's assigned port automatically.
  - **Overriding `device` is discouraged**: it breaks the file-to-radio mapping the add-on relies on.
  - **Protocol selection is subtractive or exclusive, never additive** (this is rtl_433's own `-R` behaviour). The default disables noisy protocols such as TPMS with negative entries like `protocol -60`, which keep every *other* decoder enabled. In an appended override, another `protocol -<n>` simply disables one more decoder. A *positive* `protocol <n>`, however, switches rtl_433 to "enable only these": it enables just the positively-listed protocols and disables everything else — so `protocol 40` means "decode **only** protocol 40", not "also decode 40". Consequently you cannot re-enable one of the default-disabled protocols (for example a single TPMS sensor) *and* keep the other decoders, because doing so requires a positive entry, which is exclusive.
- - Because the file is rendered through a shell heredoc, **dollar signs and other special shell characters need to be escaped**. For example, to use the literal string `$GPRMC`, write `\$GPRMC`.
+ - Override files are used as-is, so **no shell escaping is required**: dollar signs, backticks, and quotes (for example a literal `$GPRMC`) can be written directly. The only thing the add-on substitutes is the `{{port}}` placeholder.
 
 For the full list of available directives, see the example config in the rtl_433 source: [rtl_433.example.conf](https://github.com/merbanan/rtl_433/blob/master/conf/rtl_433.example.conf), the [official rtl_433 documentation](https://triq.org/rtl_433), and the supported protocol list in the [rtl_433 README](https://github.com/merbanan/rtl_433/blob/master/README.md).
 
