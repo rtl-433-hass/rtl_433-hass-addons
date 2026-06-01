@@ -79,4 +79,17 @@ The pull request title should always be the value of the first commit in the bra
 
 ## Testing
 
-Rely on pre-commit hooks to run all checks automatically.
+Pre-commit hooks still run the linters (shellcheck, hadolint, actionlint,
+check-yaml/json) automatically.
+
+Automated tests run in CI on every push/PR and can also be run locally:
+- **BATS unit tests** for the `rtl_433/run.sh` helper functions:
+  `bats -r tests/` (the `-r` is required so bats recurses into
+  `tests/rtl_433/`).
+- **Container smoke test** — builds `./rtl_433` and checks the binary plus the
+  baked-in configs; see `.github/workflows/smoke-tests.yml`.
+- **Config validation**: `python3 tests/config/validate_configs.py`.
+
+`run.sh` is `main()`-guarded so its functions can be sourced by the tests
+without running the entrypoint. See `tests/README.md` for layout and fixture
+conventions.

@@ -195,9 +195,9 @@ graph TD
 **Parallel Tasks:**
 - ✔️ Task 004: Add the three CI workflows (depends on: 002, 003)
 
-### Phase 4: Documentation
+### ✅ Phase 4: Documentation
 **Parallel Tasks:**
-- Task 005: Update `AGENTS.md` Testing section and add `tests/README.md` (depends on: 002, 003, 004)
+- ✔️ Task 005: Update `AGENTS.md` Testing section and add `tests/README.md` (depends on: 002, 003, 004)
 
 ### Post-phase Actions
 After each phase, run the validation gate in `/config/hooks/POST_PHASE.md` (lint via `pre-commit run --all-files`, and run the relevant tests as they come online).

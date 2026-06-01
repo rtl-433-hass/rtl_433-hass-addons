@@ -2,7 +2,7 @@
 id: 5
 group: "ci"
 dependencies: [2, 3, 4]
-status: "pending"
+status: "completed"
 created: 2026-06-01
 skills:
   - documentation
