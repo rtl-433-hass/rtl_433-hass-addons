@@ -162,157 +162,163 @@ radio_match_id() {
     printf '%s' "$raw" | tr -c 'A-Za-z0-9:._-' '_'
 }
 
-# Read the "Disable TPMS sensors" add-on option (default on). When true, the
-# build-time-generated TPMS 'protocol -N' disables are appended to every radio's
-# rendered config. When false, no disables are appended, so every decoder
-# rtl_433 ships is enabled.
-disable_tpms="false"
-if bashio::config.true 'disable_tpms'
-then
-    disable_tpms="true"
-fi
-
-# Read the "Log received messages" add-on option. When true, 'output kv' is
-# appended to every radio's rendered config so decoded events show in the log.
-log_received_messages="false"
-if bashio::config.true 'log_received_messages'
-then
-    log_received_messages="true"
-fi
-
-# Read the "Log diagnostic messages" add-on option. When true, 'output log' is
-# appended to every radio's rendered config so rtl_433's own status/diagnostic
-# messages show in the log. This is separate from the decoded-event 'output kv'.
-log_diagnostic_messages="false"
-if bashio::config.true 'log_diagnostic_messages'
-then
-    log_diagnostic_messages="true"
-fi
-
-# Directory rendered configs are written to. Never the user config directory.
-mkdir -p "$render_dir"
-
-# Enumerate RTL-SDR dongles once so each radio's identifier can be resolved from
-# real hardware (serial / USB port path) rather than the unstable device index.
-mapfile -t rtlsdr_devices < <(enumerate_rtlsdr_devices)
-
-# Parallel arrays describing each launched radio. These are populated during port
-# assignment/launch and consumed by the Supervisor discovery step below, which
-# iterates them to publish one Home Assistant discovery message per radio.
-radio_ports=()
-radio_tags=()
-radio_unique_ids=()
-
-# Space-padded set of override identifiers that matched a detected radio, so we
-# can warn about leftover '<id>.conf' files that match nothing.
-matched_ids=" "
-
-rtl_433_pids=()
-
-# Render one radio's config from the baked-in default and launch rtl_433 for it.
-# Args:
-#   $1 port          - assigned HTTP port (substituted into the default's ${port})
-#   $2 tag           - short label used for log prefixing and the render filename
-#   $3 device_line   - 'device ...' line injected before the default (empty when
-#                      the device selection is left entirely to the default)
-#   $4 override_file - file whose contents are appended after the default (may be
-#                      empty)
-#   $5 uid           - discovery unique_id
-#   $6 source_label  - path shown in the 'appended from' comment (defaults to $4)
-launch_radio() {
-    local port="$1" tag="$2" device_line="$3" override_file="$4" uid="$5" source_label="${6:-$4}"
-    local live="${render_dir}/${tag}.conf"
-
-    # Build the raw rendered config: optional injected device line + baked-in
-    # default + any override file + optional 'output kv'/'output log' lines.
-    {
-        [ -n "$device_line" ] && echo "$device_line"
-        cat "$default_conf"
-        if [ "$disable_tpms" = "true" ] && [ -f "$tpms_disables_conf" ]
-        then
-            echo
-            cat "$tpms_disables_conf"
-        fi
-        if [ -n "$override_file" ] && [ -f "$override_file" ]
-        then
-            echo
-            echo "# --- appended from ${source_label} ---"
-            cat "$override_file"
-        fi
-        if [ "$log_received_messages" = "true" ]
-        then
-            echo
-            echo "output kv"
-        fi
-        if [ "$log_diagnostic_messages" = "true" ]
-        then
-            echo
-            echo "output log"
-        fi
-        # Trailing newline so the last line is rendered even if an override file
-        # lacks one.
-        echo
-    } > "${live}.raw"
-
-    # Render the live config by substituting the radio's assigned HTTP port. The
-    # canonical placeholder is '{{port}}'; the legacy '${port}' form is also
-    # accepted so existing override files keep working. This is a plain literal
-    # substitution (not shell expansion), so '$', backticks, and quotes in an
-    # override file are left untouched and need no escaping. '$port' is always
-    # numeric, so it is safe to inline into the replacement.
-    sed -e "s|{{port}}|$port|g" -e "s|[$]{port}|$port|g" "${live}.raw" > "$live"
-
-    echo "Starting rtl_433 with $live..."
-    rtl_433 -c "$live" > >(sed -u "s/^/[$tag] /") 2> >(>&2 sed -u "s/^/[$tag] /")&
-    rtl_433_pids+=("$!")
-
-    radio_ports+=("$port")
-    radio_tags+=("$tag")
-    radio_unique_ids+=("$uid")
-}
-
-if [ "${#rtlsdr_devices[@]}" -eq 0 ]
-then
-    bashio::log.warning "No RTL-SDR dongles detected; only explicitly-declared radios (if any) will be launched."
-fi
-
-for i in "${!rtlsdr_devices[@]}"
-do
-    if [ "$i" -ge "$MAX_RADIOS" ]
+# Run the add-on: read options, enumerate radios, launch rtl_433 per radio,
+# publish discovery, then block. Defined as a function so the file can be sourced
+# (e.g. by BATS tests) to load the pure helpers above without executing any of
+# this. Variables here are intentionally global (no 'local') so the nested and
+# top-level helpers continue to read them.
+main() {
+    # Read the "Disable TPMS sensors" add-on option (default on). When true, the
+    # build-time-generated TPMS 'protocol -N' disables are appended to every radio's
+    # rendered config. When false, no disables are appended, so every decoder
+    # rtl_433 ships is enabled.
+    disable_tpms="false"
+    if bashio::config.true 'disable_tpms'
     then
-        bashio::log.warning "More than ${MAX_RADIOS} RTL-SDR dongles detected; the maximum supported is ${MAX_RADIOS}. Skipping the rest."
-        break
+        disable_tpms="true"
     fi
 
-    entry="${rtlsdr_devices[$i]}"
-    serial="${entry%%$'\t'*}"
-    portpath="${entry#*$'\t'}"
-
-    port=$((BASE_PORT + i))
-
-    # Determine the rtl_433 device selector for this dongle: a ':SERIAL' selector
-    # when the serial is usable, else the bare enumeration index.
-    if _serial_is_usable "$serial"
+    # Read the "Log received messages" add-on option. When true, 'output kv' is
+    # appended to every radio's rendered config so decoded events show in the log.
+    log_received_messages="false"
+    if bashio::config.true 'log_received_messages'
     then
-        selector=":${serial}"
-    else
-        selector="$i"
+        log_received_messages="true"
     fi
 
-    # Raw, filename-safe identifier used to match an override file.
-    match_id="$(radio_match_id "$serial" "$portpath")"
-    expected_file="${conf_directory}/${match_id}.conf"
-    matched_ids+="${match_id} "
+    # Read the "Log diagnostic messages" add-on option. When true, 'output log' is
+    # appended to every radio's rendered config so rtl_433's own status/diagnostic
+    # messages show in the log. This is separate from the decoded-event 'output kv'.
+    log_diagnostic_messages="false"
+    if bashio::config.true 'log_diagnostic_messages'
+    then
+        log_diagnostic_messages="true"
+    fi
 
-    # Resolve a stable identifier (serial -> USB port path) for discovery. Pass
-    # the same selector used above so the resolution matches this enumerated
-    # entry.
-    unique_id="$(resolve_radio_unique_id "$selector" "$match_id")"
+    # Directory rendered configs are written to. Never the user config directory.
+    mkdir -p "$render_dir"
 
-    bashio::log.info "Radio ${match_id} -> HTTP port ${port}. To customize, create ${expected_file}."
+    # Enumerate RTL-SDR dongles once so each radio's identifier can be resolved from
+    # real hardware (serial / USB port path) rather than the unstable device index.
+    mapfile -t rtlsdr_devices < <(enumerate_rtlsdr_devices)
 
-    launch_radio "$port" "$match_id" "device ${selector}" "$expected_file" "$unique_id"
-done
+    # Parallel arrays describing each launched radio. These are populated during port
+    # assignment/launch and consumed by the Supervisor discovery step below, which
+    # iterates them to publish one Home Assistant discovery message per radio.
+    radio_ports=()
+    radio_tags=()
+    radio_unique_ids=()
+
+    # Space-padded set of override identifiers that matched a detected radio, so we
+    # can warn about leftover '<id>.conf' files that match nothing.
+    matched_ids=" "
+
+    rtl_433_pids=()
+
+    # Render one radio's config from the baked-in default and launch rtl_433 for it.
+    # Args:
+    #   $1 port          - assigned HTTP port (substituted into the default's ${port})
+    #   $2 tag           - short label used for log prefixing and the render filename
+    #   $3 device_line   - 'device ...' line injected before the default (empty when
+    #                      the device selection is left entirely to the default)
+    #   $4 override_file - file whose contents are appended after the default (may be
+    #                      empty)
+    #   $5 uid           - discovery unique_id
+    #   $6 source_label  - path shown in the 'appended from' comment (defaults to $4)
+    launch_radio() {
+        local port="$1" tag="$2" device_line="$3" override_file="$4" uid="$5" source_label="${6:-$4}"
+        local live="${render_dir}/${tag}.conf"
+
+        # Build the raw rendered config: optional injected device line + baked-in
+        # default + any override file + optional 'output kv'/'output log' lines.
+        {
+            [ -n "$device_line" ] && echo "$device_line"
+            cat "$default_conf"
+            if [ "$disable_tpms" = "true" ] && [ -f "$tpms_disables_conf" ]
+            then
+                echo
+                cat "$tpms_disables_conf"
+            fi
+            if [ -n "$override_file" ] && [ -f "$override_file" ]
+            then
+                echo
+                echo "# --- appended from ${source_label} ---"
+                cat "$override_file"
+            fi
+            if [ "$log_received_messages" = "true" ]
+            then
+                echo
+                echo "output kv"
+            fi
+            if [ "$log_diagnostic_messages" = "true" ]
+            then
+                echo
+                echo "output log"
+            fi
+            # Trailing newline so the last line is rendered even if an override file
+            # lacks one.
+            echo
+        } > "${live}.raw"
+
+        # Render the live config by substituting the radio's assigned HTTP port. The
+        # canonical placeholder is '{{port}}'; the legacy '${port}' form is also
+        # accepted so existing override files keep working. This is a plain literal
+        # substitution (not shell expansion), so '$', backticks, and quotes in an
+        # override file are left untouched and need no escaping. '$port' is always
+        # numeric, so it is safe to inline into the replacement.
+        sed -e "s|{{port}}|$port|g" -e "s|[$]{port}|$port|g" "${live}.raw" > "$live"
+
+        echo "Starting rtl_433 with $live..."
+        rtl_433 -c "$live" > >(sed -u "s/^/[$tag] /") 2> >(>&2 sed -u "s/^/[$tag] /")&
+        rtl_433_pids+=("$!")
+
+        radio_ports+=("$port")
+        radio_tags+=("$tag")
+        radio_unique_ids+=("$uid")
+    }
+
+    if [ "${#rtlsdr_devices[@]}" -eq 0 ]
+    then
+        bashio::log.warning "No RTL-SDR dongles detected; only explicitly-declared radios (if any) will be launched."
+    fi
+
+    for i in "${!rtlsdr_devices[@]}"
+    do
+        if [ "$i" -ge "$MAX_RADIOS" ]
+        then
+            bashio::log.warning "More than ${MAX_RADIOS} RTL-SDR dongles detected; the maximum supported is ${MAX_RADIOS}. Skipping the rest."
+            break
+        fi
+
+        entry="${rtlsdr_devices[$i]}"
+        serial="${entry%%$'\t'*}"
+        portpath="${entry#*$'\t'}"
+
+        port=$((BASE_PORT + i))
+
+        # Determine the rtl_433 device selector for this dongle: a ':SERIAL' selector
+        # when the serial is usable, else the bare enumeration index.
+        if _serial_is_usable "$serial"
+        then
+            selector=":${serial}"
+        else
+            selector="$i"
+        fi
+
+        # Raw, filename-safe identifier used to match an override file.
+        match_id="$(radio_match_id "$serial" "$portpath")"
+        expected_file="${conf_directory}/${match_id}.conf"
+        matched_ids+="${match_id} "
+
+        # Resolve a stable identifier (serial -> USB port path) for discovery. Pass
+        # the same selector used above so the resolution matches this enumerated
+        # entry.
+        unique_id="$(resolve_radio_unique_id "$selector" "$match_id")"
+
+        bashio::log.info "Radio ${match_id} -> HTTP port ${port}. To customize, create ${expected_file}."
+
+        launch_radio "$port" "$match_id" "device ${selector}" "$expected_file" "$unique_id"
+    done
 
 # Launch explicitly-declared radios from config-dir files that did not match a
 # detected RTL-SDR dongle. Such a file becomes its own radio only when it carries
@@ -320,135 +326,140 @@ done
 # auto-detected); otherwise it is an orphan (typo or unplugged dongle) and is
 # ignored with a warning. Auto-detected radios were launched first, so these are
 # assigned the next free ports.
-for f in "$conf_directory"/*.conf
-do
-    # Skip the glob literal when no override files exist.
-    [ -e "$f" ] || continue
-
-    base="$(basename "$f" .conf)"
-
-    # Skip files already consumed as an override for a detected radio.
-    case "$matched_ids" in
-        *" ${base} "*) continue ;;
-    esac
-
-    if ! grep -qE '^[[:space:]]*device[[:space:]]' "$f"
-    then
-        bashio::log.warning "Config file ${f} matches no detected RTL-SDR radio and declares no 'device' line; ignoring it."
-        continue
-    fi
-
-    if [ "${#radio_ports[@]}" -ge "$MAX_RADIOS" ]
-    then
-        bashio::log.warning "Maximum of ${MAX_RADIOS} radios reached; skipping explicitly-declared radio ${f}."
-        continue
-    fi
-
-    # Filename-safe tag, consistent with how detected identifiers are sanitised.
-    tag="$(printf '%s' "$base" | tr -c 'A-Za-z0-9:._-' '_')"
-    port=$((BASE_PORT + ${#radio_ports[@]}))
-
-    # Pull the 'device' line out so it can be injected before the default's output
-    # line (rtl_433 expects 'device' before any 'output'); append the rest of the
-    # user's file with its 'device' lines stripped to avoid a duplicate after the
-    # output line.
-    device_value="$(grep -m1 -E '^[[:space:]]*device[[:space:]]' "$f" | sed -E 's/^[[:space:]]*device[[:space:]]+//')"
-    stripped="${render_dir}/${tag}.user"
-    grep -vE '^[[:space:]]*device[[:space:]]' "$f" > "$stripped"
-
-    unique_id="$(resolve_radio_unique_id "$device_value" "$tag")"
-
-    bashio::log.info "Explicitly-declared radio ${tag} (device '${device_value}') -> HTTP port ${port}."
-
-    launch_radio "$port" "$tag" "device ${device_value}" "$stripped" "$unique_id" "$f"
-done
-
-# ---------------------------------------------------------------------------
-# Publish each radio to the Home Assistant Supervisor discovery API.
-#
-# This runs after the radios are launched (so a radio that failed to start is
-# not advertised) but before the blocking 'wait' below. Every step here is
-# best-effort: a failure to publish must never stop the radios from running.
-# ---------------------------------------------------------------------------
-publish_discovery() {
-    # The Supervisor token is injected into the add-on environment when
-    # 'hassio_api: true' is set in config.json. Without it we cannot reach the
-    # Supervisor API (e.g. local/test runs), so log and skip gracefully.
-    if [ -z "${SUPERVISOR_TOKEN:-}" ]
-    then
-        bashio::log.info "SUPERVISOR_TOKEN not set; skipping Supervisor discovery publication."
-        return 0
-    fi
-
-    # Determine the host Home Assistant should connect to. We use the add-on's
-    # Supervisor-assigned hostname rather than a hard-coded IP so the value
-    # stays correct across restarts and networks. bashio::addon.hostname wraps
-    # the Supervisor '/addons/self/info' endpoint; if that helper is missing or
-    # returns nothing we fall back to querying the endpoint directly.
-    local host=""
-    if bashio::var.has_value "$(bashio::addon.hostname 2>/dev/null)"
-    then
-        host="$(bashio::addon.hostname)"
-    else
-        host="$(curl -s -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
-            "http://supervisor/addons/self/info" \
-            | sed -n 's/.*"hostname"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
-    fi
-
-    if [ -z "$host" ]
-    then
-        bashio::log.warning "Could not determine the add-on hostname; skipping Supervisor discovery publication."
-        return 0
-    fi
-
-    local i port tag uid body http_code
-    for i in "${!radio_ports[@]}"
+    for f in "$conf_directory"/*.conf
     do
-        port="${radio_ports[$i]}"
-        tag="${radio_tags[$i]}"
-        uid="${radio_unique_ids[$i]}"
+        # Skip the glob literal when no override files exist.
+        [ -e "$f" ] || continue
 
-        # Build the discovery payload with printf (jq is not in the runtime
-        # image). 'service' MUST equal the discovery entry in config.json
-        # ("rtl_433"). The integration connects to ws://<host>:<port>/ws and uses
-        # 'unique_id' as a stable per-radio key. host/port are interpolated; the
-        # unique_id is pre-sanitised to a JSON-safe character set by
-        # resolve_radio_unique_id, so no further JSON escaping is needed.
-        printf -v body \
-            '{"service": "rtl_433", "config": {"host": "%s", "port": %s, "path": "/ws", "secure": false, "unique_id": "%s"}}' \
-            "$host" "$port" "$uid"
+        base="$(basename "$f" .conf)"
 
-        # Best-effort POST. Capture the HTTP status separately from the body so
-        # a non-2xx response or a curl failure is logged but never aborts the
-        # script. -o /dev/null discards the response body.
-        http_code="$(curl -s -o /dev/null -w '%{http_code}' \
-            -X POST \
-            -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d "$body" \
-            "http://supervisor/discovery" 2>/dev/null)" || http_code="000"
+        # Skip files already consumed as an override for a detected radio.
+        case "$matched_ids" in
+            *" ${base} "*) continue ;;
+        esac
 
-        if [[ "$http_code" =~ ^2 ]]
+        if ! grep -qE '^[[:space:]]*device[[:space:]]' "$f"
         then
-            bashio::log.info "Published discovery for radio '${tag}' on port ${port} (HTTP ${http_code})."
-        else
-            # The Supervisor may reject the 'rtl_433' service until the
-            # integration registers discovery support. This is expected and
-            # non-fatal; the radios keep running regardless.
-            bashio::log.warning "Discovery publication for radio '${tag}' on port ${port} returned HTTP ${http_code} (non-fatal; Supervisor may reject the service until the integration supports discovery)."
+            bashio::log.warning "Config file ${f} matches no detected RTL-SDR radio and declares no 'device' line; ignoring it."
+            continue
         fi
+
+        if [ "${#radio_ports[@]}" -ge "$MAX_RADIOS" ]
+        then
+            bashio::log.warning "Maximum of ${MAX_RADIOS} radios reached; skipping explicitly-declared radio ${f}."
+            continue
+        fi
+
+        # Filename-safe tag, consistent with how detected identifiers are sanitised.
+        tag="$(printf '%s' "$base" | tr -c 'A-Za-z0-9:._-' '_')"
+        port=$((BASE_PORT + ${#radio_ports[@]}))
+
+        # Pull the 'device' line out so it can be injected before the default's output
+        # line (rtl_433 expects 'device' before any 'output'); append the rest of the
+        # user's file with its 'device' lines stripped to avoid a duplicate after the
+        # output line.
+        device_value="$(grep -m1 -E '^[[:space:]]*device[[:space:]]' "$f" | sed -E 's/^[[:space:]]*device[[:space:]]+//')"
+        stripped="${render_dir}/${tag}.user"
+        grep -vE '^[[:space:]]*device[[:space:]]' "$f" > "$stripped"
+
+        unique_id="$(resolve_radio_unique_id "$device_value" "$tag")"
+
+        bashio::log.info "Explicitly-declared radio ${tag} (device '${device_value}') -> HTTP port ${port}."
+
+        launch_radio "$port" "$tag" "device ${device_value}" "$stripped" "$unique_id" "$f"
     done
+
+    # ---------------------------------------------------------------------------
+    # Publish each radio to the Home Assistant Supervisor discovery API.
+    #
+    # This runs after the radios are launched (so a radio that failed to start is
+    # not advertised) but before the blocking 'wait' below. Every step here is
+    # best-effort: a failure to publish must never stop the radios from running.
+    # ---------------------------------------------------------------------------
+    publish_discovery() {
+        # The Supervisor token is injected into the add-on environment when
+        # 'hassio_api: true' is set in config.json. Without it we cannot reach the
+        # Supervisor API (e.g. local/test runs), so log and skip gracefully.
+        if [ -z "${SUPERVISOR_TOKEN:-}" ]
+        then
+            bashio::log.info "SUPERVISOR_TOKEN not set; skipping Supervisor discovery publication."
+            return 0
+        fi
+
+        # Determine the host Home Assistant should connect to. We use the add-on's
+        # Supervisor-assigned hostname rather than a hard-coded IP so the value
+        # stays correct across restarts and networks. bashio::addon.hostname wraps
+        # the Supervisor '/addons/self/info' endpoint; if that helper is missing or
+        # returns nothing we fall back to querying the endpoint directly.
+        local host=""
+        if bashio::var.has_value "$(bashio::addon.hostname 2>/dev/null)"
+        then
+            host="$(bashio::addon.hostname)"
+        else
+            host="$(curl -s -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+                "http://supervisor/addons/self/info" \
+                | sed -n 's/.*"hostname"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+        fi
+
+        if [ -z "$host" ]
+        then
+            bashio::log.warning "Could not determine the add-on hostname; skipping Supervisor discovery publication."
+            return 0
+        fi
+
+        local i port tag uid body http_code
+        for i in "${!radio_ports[@]}"
+        do
+            port="${radio_ports[$i]}"
+            tag="${radio_tags[$i]}"
+            uid="${radio_unique_ids[$i]}"
+
+            # Build the discovery payload with printf (jq is not in the runtime
+            # image). 'service' MUST equal the discovery entry in config.json
+            # ("rtl_433"). The integration connects to ws://<host>:<port>/ws and uses
+            # 'unique_id' as a stable per-radio key. host/port are interpolated; the
+            # unique_id is pre-sanitised to a JSON-safe character set by
+            # resolve_radio_unique_id, so no further JSON escaping is needed.
+            printf -v body \
+                '{"service": "rtl_433", "config": {"host": "%s", "port": %s, "path": "/ws", "secure": false, "unique_id": "%s"}}' \
+                "$host" "$port" "$uid"
+
+            # Best-effort POST. Capture the HTTP status separately from the body so
+            # a non-2xx response or a curl failure is logged but never aborts the
+            # script. -o /dev/null discards the response body.
+            http_code="$(curl -s -o /dev/null -w '%{http_code}' \
+                -X POST \
+                -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+                -H "Content-Type: application/json" \
+                -d "$body" \
+                "http://supervisor/discovery" 2>/dev/null)" || http_code="000"
+
+            if [[ "$http_code" =~ ^2 ]]
+            then
+                bashio::log.info "Published discovery for radio '${tag}' on port ${port} (HTTP ${http_code})."
+            else
+                # The Supervisor may reject the 'rtl_433' service until the
+                # integration registers discovery support. This is expected and
+                # non-fatal; the radios keep running regardless.
+                bashio::log.warning "Discovery publication for radio '${tag}' on port ${port} returned HTTP ${http_code} (non-fatal; Supervisor may reject the service until the integration supports discovery)."
+            fi
+        done
+    }
+
+    publish_discovery
+
+    # Block on the radios. With no radios launched there is nothing to wait on, so
+    # sleep indefinitely to keep the add-on container alive (and restartable) rather
+    # than exiting immediately.
+    if [ "${#rtl_433_pids[@]}" -gt 0 ]
+    then
+        wait -n "${rtl_433_pids[@]}"
+    else
+        bashio::log.info "No radios running; idling."
+        sleep infinity
+    fi
 }
 
-publish_discovery
-
-# Block on the radios. With no radios launched there is nothing to wait on, so
-# sleep indefinitely to keep the add-on container alive (and restartable) rather
-# than exiting immediately.
-if [ "${#rtl_433_pids[@]}" -gt 0 ]
-then
-    wait -n "${rtl_433_pids[@]}"
-else
-    bashio::log.info "No radios running; idling."
-    sleep infinity
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+    main "$@"
 fi
