@@ -220,8 +220,6 @@ rtl_433_pids=()
 #   $5 uid           - discovery unique_id
 #   $6 source_label  - path shown in the 'appended from' comment (defaults to $4)
 launch_radio() {
-    # 'port' is referenced by the rendered heredoc via ${port}.
-    # shellcheck disable=SC2034
     local port="$1" tag="$2" device_line="$3" override_file="$4" uid="$5" source_label="${6:-$4}"
     local live="${render_dir}/${tag}.conf"
 
@@ -251,20 +249,18 @@ launch_radio() {
             echo
             echo "output log"
         fi
+        # Trailing newline so the last line is rendered even if an override file
+        # lacks one.
+        echo
     } > "${live}.raw"
 
-    # Substitute ${port} (and allow advanced shell escapes) by sourcing the raw
-    # config wrapped in a heredoc. 'port' is in scope and expands here.
-    {
-        echo "cat <<EOD > $live"
-        cat "${live}.raw"
-        # Ensure a trailing newline even if the override file lacks one.
-        echo
-        echo EOD
-    } > /tmp/rtl_433_heredoc
-
-    # shellcheck source=/dev/null
-    source /tmp/rtl_433_heredoc
+    # Render the live config by substituting the radio's assigned HTTP port. The
+    # canonical placeholder is '{{port}}'; the legacy '${port}' form is also
+    # accepted so existing override files keep working. This is a plain literal
+    # substitution (not shell expansion), so '$', backticks, and quotes in an
+    # override file are left untouched and need no escaping. '$port' is always
+    # numeric, so it is safe to inline into the replacement.
+    sed -e "s|{{port}}|$port|g" -e "s|[$]{port}|$port|g" "${live}.raw" > "$live"
 
     echo "Starting rtl_433 with $live..."
     rtl_433 -c "$live" > >(sed -u "s/^/[$tag] /") 2> >(>&2 sed -u "s/^/[$tag] /")&
