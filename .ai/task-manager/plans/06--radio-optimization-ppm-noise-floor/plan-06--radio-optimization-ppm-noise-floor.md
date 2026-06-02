@@ -249,9 +249,9 @@ No circular dependencies; every task is in exactly one phase.
 - ✔️ Task 001: Add rtl-sdr and gnuplot to the image and smoke-test them
 - ✔️ Task 002: Add the three new add-on options to both config.json files and validate them
 
-### Phase 2: PPM calibration in run.sh
+### ✅ Phase 2: PPM calibration in run.sh
 **Parallel Tasks:**
-- Task 003: Implement PPM offset calibration in run.sh (depends on: 002)
+- ✔️ Task 003: Implement PPM offset calibration in run.sh (depends on: 002)
 
 ### Phase 3: Noise-floor detection in run.sh
 **Parallel Tasks:**

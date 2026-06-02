@@ -46,6 +46,20 @@ SYSFS_USB_BASE="${SYSFS_USB_BASE:-/sys/bus/usb/devices}"
 # run with no radios can delete it. Overridable so tests can use a temp dir.
 DATA_DIR="${DATA_DIR:-/data}"
 
+# How long to sample a dongle with 'rtl_test -p' when auto-measuring its PPM
+# crystal offset. rtl_test refines a cumulative PPM estimate over time, so a
+# longer window is more accurate; ~3 minutes is a good one-off balance. The
+# result is cached (see ppm_cache_dir) and reused on later boots.
+PPM_CALIBRATION_SECONDS=180
+
+# Where measured per-radio PPM offsets are cached, one '<id>.ppm' file per radio.
+# This lives in the user-visible add-on config directory (next to each radio's
+# '<id>.conf' override), NOT the private '/data' volume, so the slow rtl_test
+# sampling runs once and is reused across restarts AND the user can delete the
+# file to force a re-measurement (or remove it and turn the option off to return
+# to defaults).
+ppm_cache_dir="$conf_directory"
+
 # Known RTL-SDR USB VID:PID identifiers (from librtlsdr's known-device table),
 # stored space-padded so a membership test is a simple glob. Used to pick out
 # RTL-SDR dongles while enumerating sysfs.
@@ -270,6 +284,61 @@ remove_discovery_state() {
     rm -f "$state"
 }
 
+# Extract the auto-measured PPM crystal offset from captured 'rtl_test -p' output.
+# rtl_test prints a refining 'cumulative PPM: <n>' line periodically; the LAST one
+# is its best estimate. Prints just that integer (which may be negative); prints
+# nothing if no such line is present. Pure string parsing. Args: <captured_text>.
+parse_rtl_test_ppm() {
+    printf '%s' "$1" \
+        | sed -n 's/.*cumulative PPM:[[:space:]]*\(-\{0,1\}[0-9]\{1,\}\).*/\1/p' \
+        | tail -n 1
+}
+
+# Path of the cache file holding one radio's measured PPM offset. Args: <id>.
+ppm_cache_path() {
+    printf '%s' "${ppm_cache_dir}/$1.ppm"
+}
+
+# Print a radio's cached PPM offset if one is stored and valid. The cache file's
+# first line is the (optionally signed) integer; a following '# measured <date>'
+# comment line (written by write_ppm_cache) is ignored. Returns non-zero with no
+# output when the file is missing or its first line is not a valid integer.
+# Args: <id>.
+read_ppm_cache() {
+    local file value
+    file="$(ppm_cache_path "$1")"
+    [ -f "$file" ] || return 1
+    # Only the first line carries the value; the rest is a human-readable comment.
+    value="$(sed -n '1p' "$file" 2>/dev/null)"
+    [[ "$value" =~ ^-?[0-9]+$ ]] || return 1
+    printf '%s' "$value"
+}
+
+# Persist a radio's measured PPM offset under ppm_cache_dir so it is reused on
+# later boots. The integer is written on the first line, with a '# measured
+# <date>' comment on the second so the cache is self-documenting (read_ppm_cache
+# reads only the first line). Best-effort: a write failure is warned, not fatal.
+# Args: <id> <ppm>.
+write_ppm_cache() {
+    local id="$1" ppm="$2" file
+    file="$(ppm_cache_path "$id")"
+    mkdir -p "$ppm_cache_dir" 2>/dev/null
+    {
+        printf '%s\n' "$ppm"
+        printf '# measured %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    } > "$file" 2>/dev/null \
+        || bashio::log.warning "Could not persist measured PPM offset to ${file}."
+}
+
+# Return 0 if an override file exists and already declares a 'ppm_error'
+# directive, so auto-measurement can defer to a user-set value. Mirrors the
+# 'device' line detection used in main(). Args: <override_file>.
+override_has_ppm_error() {
+    local file="$1"
+    [ -n "$file" ] && [ -f "$file" ] || return 1
+    grep -qE '^[[:space:]]*ppm_error[[:space:]]' "$file"
+}
+
 # Run the add-on: read options, enumerate radios, launch rtl_433 per radio,
 # publish discovery, then block. Defined as a function so the file can be sourced
 # (e.g. by BATS tests) to load the pure helpers above without executing any of
@@ -301,6 +370,18 @@ main() {
     if bashio::config.true 'log_diagnostic_messages'
     then
         log_diagnostic_messages="true"
+    fi
+
+    # Read the "Correct PPM offset" add-on option (default off). When true, each
+    # detected radio's crystal PPM offset is measured once with rtl_test, cached
+    # as '<id>.ppm' in the add-on config directory, and injected as a 'ppm_error'
+    # directive into its rendered config (unless an override already sets
+    # ppm_error). When false, none of the PPM code runs and the rendered
+    # config/logs are unchanged.
+    correct_ppm_offset="false"
+    if bashio::config.true 'correct_ppm_offset'
+    then
+        correct_ppm_offset="true"
     fi
 
     # Directory rendered configs are written to. Never the user config directory.
@@ -339,8 +420,9 @@ main() {
     #                      empty)
     #   $5 uid           - discovery unique_id
     #   $6 source_label  - path shown in the 'appended from' comment (defaults to $4)
+    #   $7 ppm           - measured PPM offset to inject as 'ppm_error' (empty for none)
     launch_radio() {
-        local port="$1" tag="$2" device_line="$3" override_file="$4" uid="$5" source_label="${6:-$4}"
+        local port="$1" tag="$2" device_line="$3" override_file="$4" uid="$5" source_label="${6:-$4}" ppm="${7:-}"
         local live="${render_dir}/${tag}.conf"
 
         # Build the raw rendered config: optional injected device line + baked-in
@@ -369,6 +451,11 @@ main() {
                 echo
                 echo "output log"
             fi
+            if [ -n "$ppm" ]
+            then
+                echo
+                echo "ppm_error $ppm"
+            fi
             # Trailing newline so the last line is rendered even if an override file
             # lacks one.
             echo
@@ -391,6 +478,43 @@ main() {
         radio_ports+=("$port")
         radio_tags+=("$tag")
         radio_unique_ids+=("$uid")
+    }
+
+    # Resolve the PPM offset to inject for one detected radio, honouring the
+    # decision order: a manual 'ppm_error' in the override wins (no auto), else a
+    # cached measurement is reused, else the dongle is sampled once with rtl_test
+    # and the result cached. Prints the integer to inject (empty for "none"); all
+    # outcomes are logged here. A missing/unparseable measurement is non-fatal.
+    # Args: <rtl_test_selector> <id> <override_file>.
+    resolve_ppm_for_radio() {
+        local sel="$1" id="$2" override_file="$3" ppm out
+        # A user-set ppm_error in the override takes precedence; leave it alone.
+        if override_has_ppm_error "$override_file"
+        then
+            bashio::log.info "Radio ${id}: manual ppm_error present in override; skipping auto PPM measurement."
+            return 0
+        fi
+        # Reuse a previously-measured value so the slow sampling runs only once.
+        if ppm="$(read_ppm_cache "$id")"
+        then
+            bashio::log.info "Radio ${id}: PPM offset ${ppm} (cached)."
+            printf '%s' "$ppm"
+            return 0
+        fi
+        # No cached value: sample the dongle. rtl_test -p runs until interrupted,
+        # so bound it with 'timeout' (which exits non-zero on expiry — expected;
+        # the captured output still holds the cumulative PPM estimate).
+        bashio::log.info "Radio ${id}: measuring PPM offset with rtl_test for up to ${PPM_CALIBRATION_SECONDS}s (startup paused; cached for next boot)..."
+        out="$(timeout "${PPM_CALIBRATION_SECONDS}" rtl_test -d "$sel" -p 2>&1)"
+        ppm="$(parse_rtl_test_ppm "$out")"
+        if [ -z "$ppm" ]
+        then
+            bashio::log.warning "Radio ${id}: could not measure a PPM offset (no cumulative PPM in rtl_test output); launching without correction."
+            return 0
+        fi
+        write_ppm_cache "$id" "$ppm"
+        bashio::log.info "Radio ${id}: PPM offset ${ppm} (measured)."
+        printf '%s' "$ppm"
     }
 
     if [ "${#rtlsdr_devices[@]}" -eq 0 ]
@@ -433,7 +557,22 @@ main() {
 
         bashio::log.info "Radio ${match_id} -> HTTP port ${port}. To customize, create ${expected_file}."
 
-        launch_radio "$port" "$match_id" "device ${selector}" "$expected_file" "$unique_id"
+        # Optionally auto-measure (or reuse a cached) PPM crystal offset for this
+        # dongle. The rtl-sdr tools take a BARE serial for '-d' (unlike rtl_433's
+        # ':serial' selector), so select by serial when usable, else by index.
+        radio_ppm=""
+        if [ "$correct_ppm_offset" = "true" ]
+        then
+            if _serial_is_usable "$serial"
+            then
+                ppm_selector="$serial"
+            else
+                ppm_selector="$i"
+            fi
+            radio_ppm="$(resolve_ppm_for_radio "$ppm_selector" "$match_id" "$expected_file")"
+        fi
+
+        launch_radio "$port" "$match_id" "device ${selector}" "$expected_file" "$unique_id" "$expected_file" "$radio_ppm"
     done
 
 # Launch explicitly-declared radios from config-dir files that did not match a
