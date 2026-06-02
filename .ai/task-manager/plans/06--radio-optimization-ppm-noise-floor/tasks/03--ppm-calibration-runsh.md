@@ -2,7 +2,7 @@
 id: 3
 group: "runsh"
 dependencies: [2]
-status: "pending"
+status: "completed"
 created: 2026-06-02
 skills:
   - bash
