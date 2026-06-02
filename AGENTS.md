@@ -17,6 +17,11 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 - `chore:` maintenance (deps, etc.)
 - `revert:` reverting changes
 
+Commits that only touch AI task-manager artifacts under `.ai/task-manager/`
+(plans, tasks, blueprints, execution summaries, archival) use `chore` (e.g.
+`chore(tasks): ...`), **not** `docs`. The `docs` type is reserved for changes to
+human- or assistant-facing documentation such as `README.md` or this file.
+
 Create unique commits for each step in a process, as long as pre-commit hooks pass. Structure commits so the reviewer has the option of squashing the commits or rebasing and merging them all.
 
 ## Linting
