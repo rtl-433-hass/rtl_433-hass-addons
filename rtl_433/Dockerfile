@@ -68,6 +68,8 @@ RUN apk add --no-cache \
     libusb \
     hackrf \
     librtlsdr \
+    rtl-sdr \
+    gnuplot \
     soapy-sdr \
     sed
 WORKDIR /root

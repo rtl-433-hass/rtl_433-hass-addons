@@ -21,6 +21,12 @@ jobs:
             --tag rtl_433-test:latest ./rtl_433
       - name: rtl_433 binary exists
         run: docker run --rm rtl_433-test:latest which rtl_433
+      - name: rtl_test binary exists
+        run: docker run --rm rtl_433-test:latest which rtl_test
+      - name: rtl_power binary exists
+        run: docker run --rm rtl_433-test:latest which rtl_power
+      - name: gnuplot binary exists
+        run: docker run --rm rtl_433-test:latest which gnuplot
       - name: rtl_433 --help runs
         run: |
           out=$(docker run --rm rtl_433-test:latest rtl_433 --help 2>&1 || true)

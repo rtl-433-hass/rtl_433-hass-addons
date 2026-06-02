@@ -24,6 +24,13 @@ REQUIRED_ARCHES = ["aarch64", "amd64"]
 # Host port -> container port. Couples to run.sh BASE_PORT=8433 / MAX_RADIOS=10.
 EXPECTED_PORTS = {f"{p}/tcp": p for p in range(8433, 8443)}
 
+# Radio-optimization options: key -> (expected default, expected schema type).
+RADIO_OPT_OPTIONS = {
+    "correct_ppm_offset": (False, "bool"),
+    "detect_noise_floor": (False, "bool"),
+    "noise_floor_bands": ("433.92M,868M,915M", "str"),
+}
+
 
 def load_json(path):
     """Return (data, error). On success error is None; on failure data is None."""
@@ -92,6 +99,28 @@ def validate_config_json(addon, addon_dir, errors):
             else:
                 errors.append(
                     f"config.json: schema '{key}' has no matching 'options' entry"
+                )
+
+    # Radio-optimization options must be present with expected defaults/types.
+    if isinstance(options, dict) and isinstance(schema, dict):
+        for key, (default, schema_type) in RADIO_OPT_OPTIONS.items():
+            if key not in options:
+                errors.append(
+                    f"config.json: 'options' must include '{key}'"
+                )
+            elif options[key] != default:
+                errors.append(
+                    f"config.json: option '{key}' must default to {default!r}; "
+                    f"got {options[key]!r}"
+                )
+            if key not in schema:
+                errors.append(
+                    f"config.json: 'schema' must include '{key}'"
+                )
+            elif schema[key] != schema_type:
+                errors.append(
+                    f"config.json: schema '{key}' must be {schema_type!r}; "
+                    f"got {schema[key]!r}"
                 )
 
     # Ports map (repo-specific invariant).

@@ -2,7 +2,7 @@
 id: 2
 group: "config"
 dependencies: []
-status: "pending"
+status: "completed"
 created: 2026-06-02
 skills:
   - json

@@ -16,12 +16,18 @@
   "options": {
     "disable_tpms": true,
     "log_received_messages": false,
-    "log_diagnostic_messages": false
+    "log_diagnostic_messages": false,
+    "correct_ppm_offset": false,
+    "detect_noise_floor": false,
+    "noise_floor_bands": "433.92M,868M,915M"
   },
   "schema": {
     "disable_tpms": "bool",
     "log_received_messages": "bool",
-    "log_diagnostic_messages": "bool"
+    "log_diagnostic_messages": "bool",
+    "correct_ppm_offset": "bool",
+    "detect_noise_floor": "bool",
+    "noise_floor_bands": "str"
   },
   "ports": {
     "8433/tcp": 8433,
