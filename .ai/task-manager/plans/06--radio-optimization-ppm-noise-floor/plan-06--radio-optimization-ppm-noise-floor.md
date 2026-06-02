@@ -268,3 +268,51 @@ After each phase, run the POST_PHASE validation gate (lint + tests as applicable
 ### Execution Summary
 - Total Phases: 4
 - Total Tasks: 6
+
+## Execution Summary
+
+**Status**: ✅ Completed Successfully
+**Completed Date**: 2026-06-02
+
+### Results
+All 6 tasks across 4 phases were implemented and committed on branch
+`feature/06--radio-optimization-ppm-noise-floor`:
+
+- **Phase 1** — Added `rtl-sdr` (`rtl_test`, `rtl_power`) and `gnuplot` to the
+  runtime image with smoke-test binary assertions; added three opt-in options
+  (`correct_ppm_offset`, `detect_noise_floor`, `noise_floor_bands`) to both
+  `rtl_433` and `rtl_433-next` `config.json`, validated by `validate_configs.py`.
+- **Phase 2** — PPM offset calibration in `run.sh`: measure-once (~180s) with
+  `rtl_test`, cache per-radio under `/data`, reuse on later boots, inject
+  `ppm_error` into the rendered config, log the active offset, and respect a
+  manually-set `ppm_error` override (skip auto). Dongle selected by serial when
+  usable, else enumeration index. Best-effort/non-fatal.
+- **Phase 3** — Noise-floor detection in `run.sh`: sweep each radio with
+  `rtl_power` per configured band on every boot (before launch, while the dongle
+  is free), writing timestamped `noise-<id>-<ts>.{csv,txt,png}` (CSV, min/median/
+  peak summary, gnuplot spectrum) to the config dir and logging a per-band
+  summary. Best-effort/non-fatal; reports not pruned.
+- **Phase 4** — 15 new BATS tests for the pure helpers (35 total, all passing);
+  documented all three options in both READMEs and the `AGENTS.md` Structure
+  section, including the boot-time-snapshot caveat and every-boot scan behavior.
+
+**Validation:** pre-commit (shellcheck/hadolint/actionlint/json/yaml) clean;
+`bats -r tests/` → 35/35; `validate_configs.py` OK. The image was built locally
+(aarch64 base) and confirmed to contain `rtl_433`, `rtl_test`, `rtl_power`, and
+`gnuplot`, with the baked configs present and `run.sh` syntax-valid.
+
+### Noteworthy Events
+- Confirmed by research that `rtl_test`/`rtl_power` accept either an index or a
+  serial on `-d`, so dongle selection reuses the existing serial-or-index logic
+  (prevents calibrating the wrong dongle on multi-dongle setups).
+- A sub-agent reported its doc edits were transiently reverted mid-session and
+  re-applied them; final state verified present in `git`.
+- Self-validation steps that exercise a *measured* PPM value and live `rtl_power`
+  CSV/PNG generation require a connected RTL-SDR dongle, unavailable in this
+  environment. They are covered indirectly by unit tests of the pure parsing/
+  caching helpers and by the smoke-test binary-presence checks.
+
+### Necessary follow-ups
+- None required. On a real Home Assistant install with a dongle, enable the
+  options to confirm the end-to-end measured-PPM injection and the generated
+  noise-floor CSV/TXT/PNG reports.
