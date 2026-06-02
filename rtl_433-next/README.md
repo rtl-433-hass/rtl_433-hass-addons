@@ -28,7 +28,16 @@ auto-detected; declare each one in a config file containing its own `device`
 line and it is launched as its own radio after any detected dongles. The
 **Log received messages** option (Configuration tab) adds `output kv` so decoded
 events show in the log, and **Log diagnostic messages** adds `output log` for
-rtl_433's own status messages. See the
+rtl_433's own status messages. **Correct PPM offset** (off by default) measures
+each dongle's crystal offset once with `rtl_test` (slow first boot; cached as
+`<id>.ppm` in the add-on config directory and reused later) and injects it as
+`ppm_error`; delete that file and turn the option off to return to defaults.
+**Detect noise floor**
+(off by default, with **Noise floor bands** defaulting to `433.92M,868M,915M`)
+sweeps each radio with `rtl_power` on every boot, writing timestamped
+`noise-<id>-<timestamp>.{csv,txt,png}` reports to the add-on config directory
+(`/addon_configs/rtl433-next/`); it is a boot-time snapshot at the configured
+band(s), not the integration's runtime frequency. See the
 [stable add-on README](../rtl_433/README.md) for full configuration details.
 
 To update rtl_433 to the latest version, uninstall and reinstall the addon.
