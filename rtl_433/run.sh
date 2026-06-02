@@ -60,6 +60,14 @@ PPM_CALIBRATION_SECONDS=180
 # to defaults).
 ppm_cache_dir="$conf_directory"
 
+# Noise-floor scan geometry. Each configured band is a center frequency that is
+# swept +/- NOISE_WINDOW_HZ (so a 2 MHz-wide window) in NOISE_BIN_HZ-wide FFT
+# bins by 'rtl_power'. A single one-shot sweep ('rtl_power -i 1 -1') is enough to
+# characterise the ambient floor; the scan is best-effort and never blocks launch
+# for long, so a wide-but-coarse window is the right trade-off.
+NOISE_WINDOW_HZ=1000000
+NOISE_BIN_HZ=10000
+
 # Known RTL-SDR USB VID:PID identifiers (from librtlsdr's known-device table),
 # stored space-padded so a membership test is a simple glob. Used to pick out
 # RTL-SDR dongles while enumerating sysfs.
@@ -339,6 +347,86 @@ override_has_ppm_error() {
     grep -qE '^[[:space:]]*ppm_error[[:space:]]' "$file"
 }
 
+# Parse the 'noise_floor_bands' option (a comma-separated list of center
+# frequencies) into 'rtl_power' sweep ranges. Each entry is a center frequency in
+# either an 'M'-suffixed MHz form ('433.92M', '868M') or plain Hz ('915000000').
+# For every valid entry one 'lo:hi:bin' triple is printed, with
+# lo=center-NOISE_WINDOW_HZ, hi=center+NOISE_WINDOW_HZ, bin=NOISE_BIN_HZ. Decimal
+# MHz are handled (433.92M -> 433920000) so the arithmetic stays integer Hz.
+# Malformed entries are skipped (with a warning). Pure: no external tools beyond
+# awk, which is deterministic. Args: <csv_string>.
+parse_noise_bands() {
+    local csv="$1" entry center
+    local IFS=','
+    for entry in $csv
+    do
+        # Trim surrounding whitespace.
+        entry="${entry#"${entry%%[![:space:]]*}"}"
+        entry="${entry%"${entry##*[![:space:]]}"}"
+        [ -n "$entry" ] || continue
+        center=""
+        case "$entry" in
+            # 'M'-suffixed MHz, optionally with a single decimal point. Scale to
+            # Hz with awk so a fractional MHz (e.g. 433.92M) lands on an integer.
+            *[Mm])
+                if [[ "${entry%[Mm]}" =~ ^[0-9]+(\.[0-9]+)?$ ]]
+                then
+                    center="$(awk -v v="${entry%[Mm]}" 'BEGIN { printf "%d", v * 1000000 }')"
+                fi
+                ;;
+            # Plain integer Hz.
+            *)
+                if [[ "$entry" =~ ^[0-9]+$ ]]
+                then
+                    center="$entry"
+                fi
+                ;;
+        esac
+        if [ -z "$center" ] || [ "$center" -le 0 ] 2>/dev/null
+        then
+            bashio::log.warning "Ignoring malformed noise_floor_bands entry '${entry}'."
+            continue
+        fi
+        printf '%s:%s:%s\n' "$((center - NOISE_WINDOW_HZ))" "$((center + NOISE_WINDOW_HZ))" "$NOISE_BIN_HZ"
+    done
+}
+
+# Compute the ambient noise statistics from an 'rtl_power' CSV. rtl_power rows are
+# 'date,time,Hz_low,Hz_high,Hz_step,samples,dB,dB,...' so the power readings are
+# fields 7..NF. All dB values across all rows are collected and 'min median peak'
+# (in dBm) is printed. Prints nothing and returns non-zero when the file has no
+# usable readings. Uses awk (sort for the median). Args: <csv_file>.
+rtl_power_stats() {
+    local file="$1"
+    [ -f "$file" ] || return 1
+    awk -F',' '
+        {
+            for (i = 7; i <= NF; i++) {
+                v = $i + 0
+                # Skip empty/non-numeric trailing fields.
+                if ($i ~ /^[[:space:]]*-?[0-9]+(\.[0-9]+)?[[:space:]]*$/) {
+                    vals[n++] = v
+                }
+            }
+        }
+        END {
+            if (n == 0) { exit 1 }
+            # Insertion sort (small datasets; avoids a non-portable asort).
+            for (i = 1; i < n; i++) {
+                key = vals[i]
+                j = i - 1
+                while (j >= 0 && vals[j] > key) { vals[j + 1] = vals[j]; j-- }
+                vals[j + 1] = key
+            }
+            min = vals[0]
+            peak = vals[n - 1]
+            if (n % 2) { median = vals[(n - 1) / 2] }
+            else { median = (vals[n / 2 - 1] + vals[n / 2]) / 2 }
+            printf "%g %g %g\n", min, median, peak
+        }
+    ' "$file"
+}
+
 # Run the add-on: read options, enumerate radios, launch rtl_433 per radio,
 # publish discovery, then block. Defined as a function so the file can be sourced
 # (e.g. by BATS tests) to load the pure helpers above without executing any of
@@ -382,6 +470,26 @@ main() {
     if bashio::config.true 'correct_ppm_offset'
     then
         correct_ppm_offset="true"
+    fi
+
+    # Read the "Detect noise floor" add-on option (default off). When true, each
+    # detected radio is swept once with rtl_power across 'noise_floor_bands' before
+    # its rtl_433 launches, writing a timestamped CSV/TXT/PNG report into the
+    # add-on config directory and logging a per-band summary. Purely diagnostic and
+    # best-effort: it never changes the rendered config and never blocks launch on
+    # failure. When false, none of the noise-floor code runs.
+    detect_noise_floor="false"
+    if bashio::config.true 'detect_noise_floor'
+    then
+        detect_noise_floor="true"
+    fi
+
+    # Center frequencies swept when detect_noise_floor is on (see parse_noise_bands
+    # for the accepted forms). Falls back to the common ISM bands when unset/empty.
+    noise_floor_bands="$(bashio::config 'noise_floor_bands')"
+    if [ -z "$noise_floor_bands" ] || [ "$noise_floor_bands" = "null" ]
+    then
+        noise_floor_bands="433.92M,868M,915M"
     fi
 
     # Directory rendered configs are written to. Never the user config directory.
@@ -517,6 +625,103 @@ main() {
         printf '%s' "$ppm"
     }
 
+    # Render the accumulated noise-floor CSV for one radio into a PNG spectrum plot
+    # via gnuplot. The rtl_power CSV packs each sweep row as
+    # 'date,time,Hz_low,Hz_high,Hz_step,samples,dB,...', so awk flattens it into
+    # 'freq_hz dB' pairs (bin i sits at Hz_low + i*Hz_step) before plotting.
+    # Best-effort: any awk/gnuplot failure (or a missing binary) is warned and
+    # skipped. Args: <csv_file> <png_file>.
+    render_noise_png() {
+        local csv="$1" png="$2" dat
+        command -v gnuplot >/dev/null 2>&1 || {
+            bashio::log.warning "gnuplot not available; skipping noise-floor PNG ${png}."
+            return 0
+        }
+        dat="$(mktemp 2>/dev/null)" || return 0
+        if ! awk -F',' '
+            {
+                lo = $3 + 0; step = $5 + 0
+                for (i = 7; i <= NF; i++) {
+                    if ($i ~ /^[[:space:]]*-?[0-9]+(\.[0-9]+)?[[:space:]]*$/) {
+                        printf "%d %g\n", lo + (i - 7) * step, $i + 0
+                    }
+                }
+            }
+        ' "$csv" > "$dat" 2>/dev/null
+        then
+            rm -f "$dat"
+            bashio::log.warning "Could not flatten noise-floor CSV for ${png}; skipping plot."
+            return 0
+        fi
+        if ! gnuplot -e "set terminal png; set output '${png}'; set xlabel 'Hz'; set ylabel 'dBm'; plot '${dat}' with lines" 2>/dev/null
+        then
+            bashio::log.warning "gnuplot failed to render noise-floor PNG ${png} (non-fatal)."
+        fi
+        rm -f "$dat"
+    }
+
+    # Sweep one radio's configured noise-floor bands with rtl_power while the
+    # dongle is still free, writing a timestamped CSV (raw sweeps), TXT (per-band
+    # min/median/peak) and PNG (spectrum) into conf_directory and logging a
+    # one-line summary per band. The rtl-sdr tools take a BARE serial for '-d'
+    # (unlike rtl_433's ':serial'), so the caller passes a serial-or-index
+    # selector. Every step is best-effort: a tool failure, empty CSV, or write
+    # error is warned and the radio still launches. Args: <selector> <id>.
+    scan_noise_for_radio() {
+        local sel="$1" id="$2" ts lo_hi_bin tmp stats min median peak label
+        local -a bands
+        ts="$(date +%Y%m%d-%H%M%S)"
+        local csv="${conf_directory}/noise-${id}-${ts}.csv"
+        local txt="${conf_directory}/noise-${id}-${ts}.txt"
+        local png="${conf_directory}/noise-${id}-${ts}.png"
+
+        mapfile -t bands < <(parse_noise_bands "$noise_floor_bands")
+        if [ "${#bands[@]}" -eq 0 ]
+        then
+            bashio::log.warning "Radio ${id}: no valid noise_floor_bands to scan; skipping noise-floor detection."
+            return 0
+        fi
+
+        bashio::log.info "Radio ${id}: measuring noise floor over ${#bands[@]} band(s) (startup paused briefly)..."
+        for lo_hi_bin in "${bands[@]}"
+        do
+            tmp="$(mktemp 2>/dev/null)" || continue
+            # One-shot sweep; 'timeout' bounds a hung rtl_power. A non-zero exit or
+            # empty capture is tolerated (the radio must still launch).
+            if ! timeout 30 rtl_power -d "$sel" -f "$lo_hi_bin" -i 1 -1 "$tmp" >/dev/null 2>&1
+            then
+                bashio::log.warning "Radio ${id}: rtl_power sweep of ${lo_hi_bin} failed (non-fatal)."
+            fi
+            if [ ! -s "$tmp" ]
+            then
+                bashio::log.warning "Radio ${id}: noise-floor sweep of ${lo_hi_bin} produced no data; skipping band."
+                rm -f "$tmp"
+                continue
+            fi
+            # Accumulate the raw sweeps so the CSV/PNG cover every band.
+            cat "$tmp" >> "$csv" 2>/dev/null \
+                || bashio::log.warning "Radio ${id}: could not write ${csv} (non-fatal)."
+            # A human-friendly label is the band's center in MHz.
+            label="$(awk -F':' 'BEGIN { } { printf "%g MHz", (($1 + $2) / 2) / 1000000 }' <<<"$lo_hi_bin")"
+            if stats="$(rtl_power_stats "$tmp")"
+            then
+                read -r min median peak <<<"$stats"
+                printf '%s: min %s dBm, median %s dBm, peak %s dBm\n' "$label" "$min" "$median" "$peak" >> "$txt" 2>/dev/null \
+                    || bashio::log.warning "Radio ${id}: could not write ${txt} (non-fatal)."
+                bashio::log.info "Radio ${id} ${label} noise floor ~ ${median} dBm (peak ${peak})."
+            else
+                bashio::log.warning "Radio ${id}: no usable readings for band ${label}."
+            fi
+            rm -f "$tmp"
+        done
+
+        if [ -s "$csv" ]
+        then
+            render_noise_png "$csv" "$png"
+            bashio::log.info "Radio ${id}: noise-floor report written to ${csv} (and .txt/.png)."
+        fi
+    }
+
     if [ "${#rtlsdr_devices[@]}" -eq 0 ]
     then
         bashio::log.warning "No RTL-SDR dongles detected; only explicitly-declared radios (if any) will be launched."
@@ -570,6 +775,20 @@ main() {
                 ppm_selector="$i"
             fi
             radio_ppm="$(resolve_ppm_for_radio "$ppm_selector" "$match_id" "$expected_file")"
+        fi
+
+        # Optionally scan the ambient noise floor while the dongle is still free
+        # (before its rtl_433 claims it). Uses the same bare serial-or-index
+        # selector the rtl-sdr tools expect. Purely diagnostic and best-effort.
+        if [ "$detect_noise_floor" = "true" ]
+        then
+            if _serial_is_usable "$serial"
+            then
+                noise_selector="$serial"
+            else
+                noise_selector="$i"
+            fi
+            scan_noise_for_radio "$noise_selector" "$match_id"
         fi
 
         launch_radio "$port" "$match_id" "device ${selector}" "$expected_file" "$unique_id" "$expected_file" "$radio_ppm"

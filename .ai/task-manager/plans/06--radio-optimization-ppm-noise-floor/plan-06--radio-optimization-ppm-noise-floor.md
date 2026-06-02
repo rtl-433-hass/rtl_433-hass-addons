@@ -253,9 +253,9 @@ No circular dependencies; every task is in exactly one phase.
 **Parallel Tasks:**
 - ✔️ Task 003: Implement PPM offset calibration in run.sh (depends on: 002)
 
-### Phase 3: Noise-floor detection in run.sh
+### ✅ Phase 3: Noise-floor detection in run.sh
 **Parallel Tasks:**
-- Task 004: Implement noise-floor detection in run.sh (depends on: 003)
+- ✔️ Task 004: Implement noise-floor detection in run.sh (depends on: 003)
 
 ### Phase 4: Tests and documentation
 **Parallel Tasks:**
