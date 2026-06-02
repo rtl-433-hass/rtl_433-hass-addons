@@ -50,6 +50,18 @@ map, reachable at `/addon_configs/<slug>/`), **not** the Home Assistant config
 directory. The add-on auto-detects connected RTL-SDR dongles and renders each
 radio's config from the baked-in default plus any matching override file.
 
+The add-on exposes three radio-optimization options (in `config.json` and
+`run.sh`): `correct_ppm_offset` (auto-measure each radio's crystal PPM offset),
+`detect_noise_floor` (sweep the ambient noise floor), and `noise_floor_bands` (a
+comma-separated list of center frequencies the noise-floor sweep uses). These
+rely on `rtl_test`, `rtl_power`, and `gnuplot`, which are now part of the image.
+The per-radio measured PPM offsets are cached in the **add-on config directory**
+as `<id>.ppm` (next to each radio's `<id>.conf` override; `ppm_cache_dir`
+defaults to `conf_directory`), so the slow `rtl_test` measurement runs once and
+is reused on later boots, and the user can delete the file to re-measure or
+return to defaults. Noise-floor reports are written to the same config
+directory.
+
 The `-next` variants are development versions built from `main`.
 
 ## Releases & Changelogs

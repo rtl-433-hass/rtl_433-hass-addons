@@ -2,7 +2,8 @@
 # shellcheck shell=bash
 # SC1090: run.sh is sourced via a runtime-computed path (cannot be followed statically).
 # SC2034: the rtlsdr_devices arrays set per-test are read by functions sourced from run.sh.
-# shellcheck disable=SC1090,SC2034
+# SC2317: the bashio::* stubs are invoked indirectly by the sourced helpers.
+# shellcheck disable=SC1090,SC2034,SC2317
 # Unit tests for the dongle-detection / identifier helpers in rtl_433/run.sh.
 #
 # run.sh has a main()-guard, so sourcing it under plain bash defines the helper
@@ -222,4 +223,143 @@ discovery_mocks() {
     [ "$status" -eq 0 ]
     [ ! -s "$CURL_LOG" ]                   # curl never called
     [ -e "$DATA_DIR/discovery.uuid" ]      # state left untouched
+}
+
+# --- parse_rtl_test_ppm ------------------------------------------------------
+
+@test "parse_rtl_test_ppm returns the LAST cumulative PPM across multiple lines" {
+    out="$(parse_rtl_test_ppm 'Reading samples...
+cumulative PPM: 12
+cumulative PPM: 34
+cumulative PPM: 56')"
+    [ "$out" = "56" ]
+}
+
+@test "parse_rtl_test_ppm returns a negative cumulative PPM" {
+    out="$(parse_rtl_test_ppm 'cumulative PPM: 7
+cumulative PPM: -42')"
+    [ "$out" = "-42" ]
+}
+
+@test "parse_rtl_test_ppm emits nothing when no PPM line is present" {
+    out="$(parse_rtl_test_ppm 'Found 1 device(s)
+Using device 0: Generic RTL2832U
+No suitable PPM line here')"
+    [ -z "$out" ]
+}
+
+# --- ppm_cache_path / write_ppm_cache / read_ppm_cache -----------------------
+
+# Point the PPM cache at a per-test temp dir. The cache lives in the add-on
+# config directory (ppm_cache_dir defaults to conf_directory), so override the
+# global directly to an isolated temp dir for these tests.
+ppm_cache_mocks() {
+    ppm_cache_dir="$BATS_TEST_TMPDIR/conf"
+    bashio::log.warning() { :; }
+}
+
+@test "ppm_cache_path prints <config-dir>/<id>.ppm" {
+    ppm_cache_mocks
+    run ppm_cache_path "rad1"
+    [ "$status" -eq 0 ]
+    [ "$output" = "${ppm_cache_dir}/rad1.ppm" ]
+}
+
+@test "ppm cache write->read round-trips the signed integer" {
+    ppm_cache_mocks
+    write_ppm_cache "rad1" "-13"
+    [ -f "${ppm_cache_dir}/rad1.ppm" ]
+    run read_ppm_cache "rad1"
+    [ "$status" -eq 0 ]
+    [ "$output" = "-13" ]
+    # The second line is a self-documenting '# measured ...' comment.
+    grep -q '^# measured ' "${ppm_cache_dir}/rad1.ppm"
+}
+
+@test "read_ppm_cache rejects a missing file" {
+    ppm_cache_mocks
+    run read_ppm_cache "nope"
+    [ "$status" -ne 0 ]
+    [ -z "$output" ]
+}
+
+@test "read_ppm_cache rejects a corrupt/non-integer first line" {
+    ppm_cache_mocks
+    mkdir -p "$ppm_cache_dir"
+    printf 'not-a-number\n# measured 2026-01-01T00:00:00Z\n' > "${ppm_cache_dir}/bad.ppm"
+    run read_ppm_cache "bad"
+    [ "$status" -ne 0 ]
+    [ -z "$output" ]
+}
+
+# --- override_has_ppm_error --------------------------------------------------
+
+@test "override_has_ppm_error is true for a file with a ppm_error line" {
+    f="$BATS_TEST_TMPDIR/with.conf"
+    printf 'frequency 433.92M\n  ppm_error 5\noutput kv\n' > "$f"
+    run override_has_ppm_error "$f"
+    [ "$status" -eq 0 ]
+}
+
+@test "override_has_ppm_error is false for a file without a ppm_error line" {
+    f="$BATS_TEST_TMPDIR/without.conf"
+    printf 'frequency 433.92M\noutput kv\n' > "$f"
+    run override_has_ppm_error "$f"
+    [ "$status" -ne 0 ]
+}
+
+@test "override_has_ppm_error is false for a missing/empty file argument" {
+    run override_has_ppm_error "$BATS_TEST_TMPDIR/does-not-exist.conf"
+    [ "$status" -ne 0 ]
+    run override_has_ppm_error ""
+    [ "$status" -ne 0 ]
+}
+
+# --- parse_noise_bands -------------------------------------------------------
+
+@test "parse_noise_bands expands the default bands into exact lo:hi:bin triples" {
+    bashio::log.warning() { :; }
+    run parse_noise_bands "433.92M,868M,915M"
+    [ "$status" -eq 0 ]
+    expected="$(printf '432920000:434920000:10000\n867000000:869000000:10000\n914000000:916000000:10000')"
+    [ "$output" = "$expected" ]
+}
+
+@test "parse_noise_bands skips a malformed token while emitting valid neighbors" {
+    bashio::log.warning() { :; }
+    run parse_noise_bands "433.92M,abc,915M"
+    [ "$status" -eq 0 ]
+    expected="$(printf '432920000:434920000:10000\n914000000:916000000:10000')"
+    [ "$output" = "$expected" ]
+}
+
+# --- rtl_power_stats ---------------------------------------------------------
+
+@test "rtl_power_stats computes min/median/peak from a sample CSV" {
+    csv="$BATS_TEST_TMPDIR/power.csv"
+    # rtl_power rows: date,time,Hz_low,Hz_high,Hz_step,samples,dB,dB,...
+    # dB values across both rows: -90 -80 -100 -70 -95 -85
+    #   sorted: -100 -95 -90 -85 -80 -70 -> min -100, peak -70,
+    #   median = (-90 + -85)/2 = -87.5
+    {
+        printf '2026-01-01,00:00:00,433000000,434000000,10000,1,-90,-80,-100\n'
+        printf '2026-01-01,00:00:01,433000000,434000000,10000,1,-70,-95,-85\n'
+    } > "$csv"
+    run rtl_power_stats "$csv"
+    [ "$status" -eq 0 ]
+    [ "$output" = "-100 -87.5 -70" ]
+}
+
+@test "rtl_power_stats returns non-zero with no output for an empty file" {
+    csv="$BATS_TEST_TMPDIR/empty.csv"
+    : > "$csv"
+    run rtl_power_stats "$csv"
+    [ "$status" -ne 0 ]
+    [ -z "$output" ]
+}
+
+@test "rtl_power_stats returns non-zero for a missing file" {
+    run rtl_power_stats "$BATS_TEST_TMPDIR/missing.csv"
+    [ "$status" -ne 0 ]
+    [ -z "$output" ]
 }

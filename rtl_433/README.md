@@ -93,6 +93,34 @@ For the full list of available directives, see the example config in the rtl_433
 
 An override file whose name does not match any detected radio **and** does not declare its own `device` line is ignored, and the add-on logs a warning so a typo or an unplugged dongle does not silently do nothing.
 
+### Correct PPM offset
+
+Every RTL-SDR dongle's crystal oscillator is slightly off-frequency, and that error (measured in parts-per-million, PPM) can be large enough to push a sensor's signal out of rtl_433's reach. The **Correct PPM offset** option in the add-on's Configuration tab turns on automatic per-radio PPM correction. It is **off by default**.
+
+When enabled, the add-on measures each detected radio's PPM offset **once**, on the first boot, by sampling the dongle with `rtl_test` for about three minutes. **Startup is paused while a radio is being measured**, so the first boot with this option on is slow (roughly three minutes per detected radio). The measured value is cached in the add-on config directory as `<id>.ppm` (right next to that radio's optional `<id>.conf` override) and reused on every later boot, so only that first measurement is slow. The active offset (whether freshly measured or read from the cache) is logged on startup, and is injected into the radio's rendered config as a `ppm_error` directive so rtl_433 compensates for it.
+
+Because the cache lives in the add-on config directory, it is visible and editable from Home Assistant (e.g. via the Samba, File Editor, or Studio Code Server add-ons at `/addon_configs/rtl433/`). So a radio logged as `Radio AB12CD34 -> ...` caches its offset in `/addon_configs/rtl433/AB12CD34.ppm`.
+
+Notes:
+
+ - **To force a fresh measurement** (for example after moving the dongle to a different machine), delete that radio's `<id>.ppm` file and restart the add-on.
+ - **To return a radio to no PPM correction**, delete its `<id>.ppm` file *and* turn the **Correct PPM offset** option off. (Turning the option off already stops the correction being applied; deleting the file also clears the stored measurement so a future re-enable measures fresh.)
+ - If a [per-radio override file](#per-radio-overrides) already sets its own `ppm_error` directive, that manual value is respected and automatic measurement is **skipped** for that radio. Copying the logged offset into an override this way is a convenient way to pin a value permanently without re-measuring.
+
+### Detect noise floor
+
+The **Detect noise floor** option (off by default) measures the ambient RF noise level around the bands your sensors use, which is useful for diagnosing reception problems (a high noise floor means weak signals are harder to decode). The companion **Noise floor bands** option is a comma-separated list of center frequencies to sweep; it defaults to `433.92M,868M,915M` (the common ISM bands). Each entry may be written in MHz with an `M` suffix (`433.92M`, `868M`) or as a plain integer number of hertz (`915000000`).
+
+While the option is on, every radio is swept with `rtl_power` **on every boot** — so turn it back off once you have collected the reports you need. Each scan writes a set of **timestamped** files into the add-on config directory (reachable at `/addon_configs/rtl433/`):
+
+ - `noise-<id>-<timestamp>.csv` — the raw `rtl_power` sweeps.
+ - `noise-<id>-<timestamp>.txt` — a per-band min / median / peak summary in dBm.
+ - `noise-<id>-<timestamp>.png` — a spectrum graph.
+
+The `<id>` is the radio's identifier (the same one used for override files). Because the files are timestamped, each boot produces a new set; **the add-on never deletes old reports**, so clean them up yourself when you no longer need them. A one-line per-band summary is also written to the add-on log, and **startup is delayed briefly while each radio is scanned**.
+
+**Important:** the noise floor reported here is a **boot-time snapshot taken at the configured band(s)**, not at whatever frequency Home Assistant is using at runtime. The rtl_433 integration can retune a radio after boot, so the live operating frequency may differ from the band(s) measured here. Treat the report as a point-in-time survey of the configured bands, not a continuous measurement of the radio's current frequency.
+
 ### Non-RTL-SDR radios (SoapySDR / HackRF)
 
 Auto-detection only finds **RTL-SDR** dongles, so SoapySDR/HackRF (and other non-RTL-SDR) devices must be declared manually. Create a config file in the add-on config directory that contains its own `device` line with the appropriate device string — for example `hackrf.conf`:

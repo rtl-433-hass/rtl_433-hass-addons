@@ -257,10 +257,10 @@ No circular dependencies; every task is in exactly one phase.
 **Parallel Tasks:**
 - ✔️ Task 004: Implement noise-floor detection in run.sh (depends on: 003)
 
-### Phase 4: Tests and documentation
+### ✅ Phase 4: Tests and documentation
 **Parallel Tasks:**
-- Task 005: BATS unit tests for the new run.sh helpers (depends on: 003, 004)
-- Task 006: Document the PPM and noise-floor features (depends on: 001, 002, 003, 004)
+- ✔️ Task 005: BATS unit tests for the new run.sh helpers (depends on: 003, 004)
+- ✔️ Task 006: Document the PPM and noise-floor features (depends on: 001, 002, 003, 004)
 
 ### Post-phase Actions
 After each phase, run the POST_PHASE validation gate (lint + tests as applicable) before transitioning.
