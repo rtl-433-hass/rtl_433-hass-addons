@@ -244,10 +244,10 @@ graph TD
 
 No circular dependencies; every task is in exactly one phase.
 
-### Phase 1: Independent foundations
+### ✅ Phase 1: Independent foundations
 **Parallel Tasks:**
-- Task 001: Add rtl-sdr and gnuplot to the image and smoke-test them
-- Task 002: Add the three new add-on options to both config.json files and validate them
+- ✔️ Task 001: Add rtl-sdr and gnuplot to the image and smoke-test them
+- ✔️ Task 002: Add the three new add-on options to both config.json files and validate them
 
 ### Phase 2: PPM calibration in run.sh
 **Parallel Tasks:**
