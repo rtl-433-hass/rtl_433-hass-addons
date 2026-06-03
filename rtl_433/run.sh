@@ -492,6 +492,17 @@ main() {
         noise_floor_bands="433.92M,868M,915M"
     fi
 
+    # Seconds rtl_power samples each band when detect_noise_floor is on. A longer
+    # window accumulates more sweeps so the min/median/peak reflect time-varying
+    # (intermittent) interference rather than a single instant. Each band is swept
+    # serially per radio, so the per-radio cost is roughly this times the number
+    # of bands. Falls back to the default when unset/non-numeric/out of range.
+    noise_floor_duration="$(bashio::config 'noise_floor_duration')"
+    if ! [[ "$noise_floor_duration" =~ ^[0-9]+$ ]] || [ "$noise_floor_duration" -lt 1 ] || [ "$noise_floor_duration" -gt 600 ]
+    then
+        noise_floor_duration=30
+    fi
+
     # Directory rendered configs are written to. Never the user config directory.
     mkdir -p "$render_dir"
 
@@ -706,13 +717,16 @@ main() {
             return 0
         fi
 
-        bashio::log.info "Radio ${id}: measuring noise floor over ${#bands[@]} band(s) (startup paused briefly)..."
+        bashio::log.info "Radio ${id}: measuring noise floor over ${#bands[@]} band(s) at ${noise_floor_duration}s each (startup paused)..."
         for lo_hi_bin in "${bands[@]}"
         do
             tmp="$(mktemp 2>/dev/null)" || continue
-            # One-shot sweep; 'timeout' bounds a hung rtl_power. A non-zero exit or
-            # empty capture is tolerated (the radio must still launch).
-            if ! timeout 30 rtl_power -d "$sel" -f "$lo_hi_bin" -i 1 -1 "$tmp" >/dev/null 2>&1
+            # Sample the band for noise_floor_duration seconds in 1-second sweeps so
+            # the accumulated rows capture time-varying interference (not a single
+            # instant). 'timeout' bounds a hung rtl_power with a margin for device
+            # setup/teardown. A non-zero exit or empty capture is tolerated (the
+            # radio must still launch).
+            if ! timeout "$((noise_floor_duration + 15))" rtl_power -d "$sel" -f "$lo_hi_bin" -i 1 -e "$noise_floor_duration" "$tmp" >/dev/null 2>&1
             then
                 bashio::log.warning "Radio ${id}: rtl_power sweep of ${lo_hi_bin} failed (non-fatal)."
             fi

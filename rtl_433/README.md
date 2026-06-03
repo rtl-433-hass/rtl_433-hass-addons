@@ -111,13 +111,15 @@ Notes:
 
 The **Detect noise floor** option (off by default) measures the ambient RF noise level around the bands your sensors use, which is useful for diagnosing reception problems (a high noise floor means weak signals are harder to decode). The companion **Noise floor bands** option is a comma-separated list of center frequencies to sweep; it defaults to `433.92M,868M,915M` (the common ISM bands). Each entry may be written in MHz with an `M` suffix (`433.92M`, `868M`) or as a plain integer number of hertz (`915000000`).
 
+The **Noise floor duration** option sets how many seconds each band is sampled (default `30`, range `1`–`600`). Each band is swept in 1-second passes for this long, and the min/median/peak are taken across every sweep — so a longer duration captures **time-varying (intermittent) interference** rather than a single instant. A short value (e.g. `1`) gives a quick instantaneous snapshot of the static floor; the `30`-second default trades startup time for a measurement that better reflects bursty interferers.
+
 While the option is on, every radio is swept with `rtl_power` **on every boot** — so turn it back off once you have collected the reports you need. Each scan writes a set of **timestamped** files into the add-on config directory (reachable at `/addon_configs/rtl433/`):
 
  - `noise-<id>-<timestamp>.csv` — the raw `rtl_power` sweeps.
  - `noise-<id>-<timestamp>.txt` — a per-band min / median / peak summary in dBm.
  - `noise-<id>-<timestamp>.png` — a spectrum graph.
 
-The `<id>` is the radio's identifier (the same one used for override files). Because the files are timestamped, each boot produces a new set; **the add-on never deletes old reports**, so clean them up yourself when you no longer need them. A one-line per-band summary is also written to the add-on log. Unlike the parallel PPM measurement above, **radios are scanned one after another, and startup is paused for each** — but each band is only a quick ~1-second `rtl_power` snapshot (bounded by a 30-second safety timeout), so in practice this adds just a few seconds per radio.
+The `<id>` is the radio's identifier (the same one used for override files). Because the files are timestamped, each boot produces a new set; **the add-on never deletes old reports**, so clean them up yourself when you no longer need them. A one-line per-band summary is also written to the add-on log. Unlike the parallel PPM measurement above, **radios are scanned one after another, and startup is paused for each** — so the added startup per radio is roughly **Noise floor duration × the number of bands** (plus a little device setup). With the defaults (30 seconds × 3 bands) that's about **90 seconds per radio**; lower **Noise floor duration** for a quicker scan or raise it for a more thorough interference survey.
 
 **Important:** the noise floor reported here is a **boot-time snapshot taken at the configured band(s)**, not at whatever frequency Home Assistant is using at runtime. The rtl_433 integration can retune a radio after boot, so the live operating frequency may differ from the band(s) measured here. Treat the report as a point-in-time survey of the configured bands, not a continuous measurement of the radio's current frequency.
 

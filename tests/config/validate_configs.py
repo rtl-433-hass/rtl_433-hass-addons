@@ -29,6 +29,7 @@ RADIO_OPT_OPTIONS = {
     "correct_ppm_offset": (False, "bool"),
     "detect_noise_floor": (False, "bool"),
     "noise_floor_bands": ("433.92M,868M,915M", "str"),
+    "noise_floor_duration": (30, "int(1,600)"),
 }
 
 
