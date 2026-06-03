@@ -14,7 +14,7 @@
   "hassio_api": true,
   "discovery": ["rtl_433"],
   "options": {
-    "randomize_default_serial": true,
+    "randomize_default_serial": false,
     "disable_tpms": true,
     "log_received_messages": false,
     "log_diagnostic_messages": false,
