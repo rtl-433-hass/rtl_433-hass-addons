@@ -384,3 +384,28 @@ ppm_cache_mocks() {
     [ "$status" -ne 0 ]
     [ -z "$output" ]
 }
+
+# --- _serial_is_default ------------------------------------------------------
+
+@test "_serial_is_default is true for empty and the factory placeholders" {
+    run _serial_is_default ""        ; [ "$status" -eq 0 ]
+    run _serial_is_default "00000000"; [ "$status" -eq 0 ]
+    run _serial_is_default "00000001"; [ "$status" -eq 0 ]
+}
+
+@test "_serial_is_default is false for realistic / non-default serials" {
+    run _serial_is_default "00000abc"; [ "$status" -ne 0 ]
+    run _serial_is_default "12345678"; [ "$status" -ne 0 ]
+}
+
+# --- generate_random_serial --------------------------------------------------
+
+@test "generate_random_serial emits exactly 8 lowercase hex characters" {
+    run generate_random_serial
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ ^[0-9a-f]{8}$ ]]
+    # A second call is also well-formed (format stable across invocations).
+    run generate_random_serial
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ ^[0-9a-f]{8}$ ]]
+}

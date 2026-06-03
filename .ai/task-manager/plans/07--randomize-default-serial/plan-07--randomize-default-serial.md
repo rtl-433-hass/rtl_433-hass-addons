@@ -173,10 +173,10 @@ No circular dependencies.
 **Parallel Tasks:**
 - ✔️ Task 002: Implement `_serial_is_default` / `generate_random_serial` helpers and the startup flashing + single re-enumeration block in `run.sh` (depends on: 001)
 
-### Phase 3: Tests & Documentation
+### ✅ Phase 3: Tests & Documentation
 **Parallel Tasks:**
-- Task 003: Add BATS unit tests for the new helpers (depends on: 002)
-- Task 004: Document the option in `rtl_433/README.md` and `rtl_433-next/README.md` (depends on: 002)
+- ✔️ Task 003: Add BATS unit tests for the new helpers (depends on: 002)
+- ✔️ Task 004: Document the option in `rtl_433/README.md` and `rtl_433-next/README.md` (depends on: 002)
 
 ### Post-phase Actions
 After each phase, run the relevant validators (`python3 tests/config/validate_configs.py` after Phase 1; `pre-commit run --all-files` and `bats -r tests/` after Phases 2–3).
