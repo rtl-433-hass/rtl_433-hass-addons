@@ -55,10 +55,12 @@ jobs:
       #
       # Rewrite the headings on the release PR branch so the fix ships as part
       # of the release commit. The date and compare link are preserved on the
-      # line below each heading. The sed only matches release-please's bracketed
+      # line below each heading. Rather than adding a second commit, the rewrite
+      # is amended into release-please's own commit and force-pushed, so the PR
+      # stays a single commit. The sed only matches release-please's bracketed
       # form, so it is idempotent: re-running on an already-normalized file (the
       # usual case, since release-please regenerates the branch on every push)
-      # changes nothing and the step exits without an empty commit.
+      # changes nothing and the step exits without amending or pushing.
       #
       # Pushes use the App token in the clone URL, not GITHUB_TOKEN, so the
       # workflow's `permissions: {}` posture is unchanged.
@@ -79,7 +81,9 @@ jobs:
             echo "CHANGELOG headings already Home Assistant-compatible; nothing to do."
             exit 0
           fi
+          # Amend into release-please's commit (preserving its message and
+          # author) so the PR keeps a single commit, then force-push the branch.
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "docs: format changelog headings for Home Assistant update notes"
-          git push origin "HEAD:${PR_BRANCH}"
+          git commit --amend --no-edit -a
+          git push --force-with-lease origin "HEAD:${PR_BRANCH}"
