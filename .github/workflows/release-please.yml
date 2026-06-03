@@ -62,6 +62,15 @@ jobs:
       # usual case, since release-please regenerates the branch on every push)
       # changes nothing and the step exits without amending or pushing.
       #
+      # The clone is intentionally NOT shallow. release-please builds the release
+      # commit via the GitHub API, so its parent (main's HEAD) is a separate
+      # object. With `--depth 1` that parent is not fetched, and `git commit
+      # --amend` then rewrites the release commit into a *root* commit -- the
+      # branch loses its ancestry to main, the PR shows the entire repo as
+      # additions (no merge base), and release-please closes and recreates the
+      # PR on every run. A full clone keeps the parent object present so the
+      # amend preserves the link back to main.
+      #
       # Pushes use the App token in the clone URL, not GITHUB_TOKEN, so the
       # workflow's `permissions: {}` posture is unchanged.
       - name: Normalize CHANGELOG headings for Home Assistant
@@ -71,7 +80,7 @@ jobs:
           PR_BRANCH: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
         run: |
           set -euo pipefail
-          git clone --branch "$PR_BRANCH" --depth 1 \
+          git clone --branch "$PR_BRANCH" \
             "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" rp-branch
           cd rp-branch
           sed -i -E \
