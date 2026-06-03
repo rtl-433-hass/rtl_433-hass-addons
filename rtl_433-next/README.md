@@ -38,7 +38,7 @@ sweeps each radio with `rtl_power` on every boot, writing timestamped
 `noise-<id>-<timestamp>.{csv,txt,png}` reports to the add-on config directory
 (`/addon_configs/rtl433-next/`); it is a boot-time snapshot at the configured
 band(s), not the integration's runtime frequency. **Randomize default serial**
-(off by default) flashes a unique random serial onto any dongle still carrying a
+(on by default) flashes a unique random serial onto any dongle still carrying a
 factory-default serial at startup, so multiple dongles become individually
 identifiable. See the
 [stable add-on README](../rtl_433/README.md) for full configuration details.

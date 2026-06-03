@@ -128,7 +128,7 @@ The `<id>` is the radio's identifier (the same one used for override files). Bec
 Nearly all RTL-SDR dongles ship with the same factory-default serial
 (`00000000` or `00000001`), which makes multiple dongles indistinguishable and
 pushes the add-on to identify them by USB port instead. The **Randomize default
-serial** option (off by default) fixes this automatically: at startup, before
+serial** option (on by default) fixes this automatically: at startup, before
 any radio claims a device, the add-on flashes a **unique random 8-hex-character
 serial** onto every connected dongle that still carries a factory-default
 serial, using `rtl_eeprom`. Dongles that already have a real serial are never
