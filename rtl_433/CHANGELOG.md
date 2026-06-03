@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.1
+
+_2026-06-03_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.6.0...v0.6.1)
+
+
+### Bug Fixes
+
+* **rtl_433:** emit report_meta level on its own line so level data is kept ([b46247d](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/b46247da2770b88e9f8639621130d22ecdf4404f))
+* **rtl_433:** show only the new version's notes in the update dialog ([da191cf](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/da191cf1357a44c34a61365342f1390a952811b8))
+
 ## 0.6.0
 
 _2026-06-03_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.5.0...v0.6.0)
