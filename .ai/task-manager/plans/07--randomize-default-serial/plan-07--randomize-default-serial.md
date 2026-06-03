@@ -169,9 +169,9 @@ No circular dependencies.
 **Parallel Tasks:**
 - ✔️ Task 001: Add `randomize_default_serial` to both `config.json` files
 
-### Phase 2: Implementation
+### ✅ Phase 2: Implementation
 **Parallel Tasks:**
-- Task 002: Implement `_serial_is_default` / `generate_random_serial` helpers and the startup flashing + single re-enumeration block in `run.sh` (depends on: 001)
+- ✔️ Task 002: Implement `_serial_is_default` / `generate_random_serial` helpers and the startup flashing + single re-enumeration block in `run.sh` (depends on: 001)
 
 ### Phase 3: Tests & Documentation
 **Parallel Tasks:**
