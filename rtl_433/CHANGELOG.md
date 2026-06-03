@@ -1,11 +1,4 @@
-## [0.4.0](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.3.0...v0.4.0) (2026-06-02)
-
-
-### Features
-
-* **rtl_433:** add SDR optimization tooling and add-on options ([8b89912](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/8b89912df4836d1024646a8adb1cb364f9183446))
-* **rtl_433:** auto-correct PPM offset on startup ([fcf0974](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/fcf09749593ae6867028fcf385e345f6c0a7d352))
-* **rtl_433:** detect noise floor on startup with rtl_power ([8e74976](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/8e7497641e36a68088e9ce72c2f1a640c8c15d53))
+# Changelog
 
 ## [0.5.0](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.4.0...v0.5.0) (2026-06-03)
 
@@ -18,6 +11,15 @@
 ### Performance Improvements
 
 * **rtl_433:** measure radio PPM offsets in parallel at startup ([1977d69](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/1977d69cecc561b33d773af64d69dc63037bee39))
+
+## [0.4.0](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.3.0...v0.4.0) (2026-06-02)
+
+
+### Features
+
+* **rtl_433:** add SDR optimization tooling and add-on options ([8b89912](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/8b89912df4836d1024646a8adb1cb364f9183446))
+* **rtl_433:** auto-correct PPM offset on startup ([fcf0974](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/fcf09749593ae6867028fcf385e345f6c0a7d352))
+* **rtl_433:** detect noise floor on startup with rtl_power ([8e74976](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/8e7497641e36a68088e9ce72c2f1a640c8c15d53))
 
 ## [0.3.0](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.2.0...v0.3.0) (2026-06-01)
 
