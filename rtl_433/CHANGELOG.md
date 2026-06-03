@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0
+
+_2026-06-03_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.6.1...v0.7.0)
+
+
+### Features
+
+* **rtl_433:** add randomize_default_serial add-on option ([#93](https://github.com/rtl-433-hass/rtl_433-hass-addons/issues/93)) ([948e032](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/948e032c6e6b2034a655c5dc5e791e361a5273bf))
+
 ## 0.6.1
 
 _2026-06-03_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.6.0...v0.6.1)
