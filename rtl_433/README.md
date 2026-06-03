@@ -143,6 +143,17 @@ Two independent options in the add-on's Configuration tab control what rtl_433 w
 
 Both default to off and can be enabled independently.
 
+### Signal level data
+
+The baked-in default config enables rtl_433's **level reporting**
+(`report_meta level`, the config-file equivalent of the `-M level` CLI flag), so
+every decoded message carries the radio's per-transmission **frequency**,
+**RSSI**, **SNR**, and **noise**. The
+[rtl_433 integration for Home Assistant](https://github.com/rtl-433-hass/rtl_433)
+surfaces these as optional per-device diagnostic sensors (disabled by default —
+enable the ones you want from each device page) for charting signal strength and
+reception quality. No add-on configuration is required.
+
 ### Breaking change / migration
 
 Earlier versions of this add-on read config files from `/config/rtl_433/` in the **Home Assistant config directory**. That location is **no longer read**. Move any per-radio tuning into `<id>.conf` files in the **add-on config directory** (`/addon_configs/rtl433/`) as described above. There is no longer a separate config file for the default case — the default is baked into the image.
