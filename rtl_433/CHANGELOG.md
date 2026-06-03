@@ -1,13 +1,17 @@
 # Changelog
 
-## [0.6.0](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.5.0...v0.6.0) (2026-06-03)
+## 0.6.0
+
+_2026-06-03_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.5.0...v0.6.0)
 
 
 ### Features
 
 * **rtl_433:** emit signal level data (-M level) in decoded events ([efac922](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/efac9227b00604409262210ccfd1afd58ad41d15))
 
-## [0.5.0](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.4.0...v0.5.0) (2026-06-03)
+## 0.5.0
+
+_2026-06-03_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.4.0...v0.5.0)
 
 
 ### Features
@@ -19,7 +23,9 @@
 
 * **rtl_433:** measure radio PPM offsets in parallel at startup ([1977d69](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/1977d69cecc561b33d773af64d69dc63037bee39))
 
-## [0.4.0](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.3.0...v0.4.0) (2026-06-02)
+## 0.4.0
+
+_2026-06-02_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.3.0...v0.4.0)
 
 
 ### Features
@@ -28,7 +34,9 @@
 * **rtl_433:** auto-correct PPM offset on startup ([fcf0974](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/fcf09749593ae6867028fcf385e345f6c0a7d352))
 * **rtl_433:** detect noise floor on startup with rtl_power ([8e74976](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/8e7497641e36a68088e9ce72c2f1a640c8c15d53))
 
-## [0.3.0](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.2.0...v0.3.0) (2026-06-01)
+## 0.3.0
+
+_2026-06-01_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.2.0...v0.3.0)
 
 
 ### Features
@@ -41,7 +49,9 @@
 
 * **rtl_433:** supervise each radio so one failure doesn't stop the add-on ([554cc81](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/554cc81c40701bc51aac1e78302f73b7508e8043))
 
-## [0.2.0](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.1.0...v0.2.0) (2026-06-01)
+## 0.2.0
+
+_2026-06-01_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.1.0...v0.2.0)
 
 
 ### ⚠ BREAKING CHANGES
@@ -61,7 +71,9 @@
 * **rtl_433:** store config in the add-on config dir and add log option ([05bcfb9](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/05bcfb9dd51f621ad4319ac9feaa2899a3d8d08e))
 * **rtl_433:** support manually-declared SoapySDR/HackRF radios ([9507a2d](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/9507a2d6495637f68e82e65ce607f8c8b8b0b73f))
 
-## [0.1.0](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.0.1...v0.1.0) (2026-05-30)
+## 0.1.0
+
+_2026-05-30_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.0.1...v0.1.0)
 
 
 ### ⚠ BREAKING CHANGES

@@ -44,3 +44,42 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      # release-please writes version headings as "## [x.y.z](compare) (date)".
+      # Home Assistant's Supervisor, however, only trims the add-on update
+      # dialog to the version you're updating *to* when each heading is a bare
+      # "## x.y.z" -- it slices CHANGELOG.md with the regex `^#* <version>\n`
+      # (homeassistant/components/hassio/update.py: async_release_notes). With
+      # the bracketed form the regex never matches and the dialog shows the
+      # ENTIRE changelog on every update.
+      #
+      # Rewrite the headings on the release PR branch so the fix ships as part
+      # of the release commit. The date and compare link are preserved on the
+      # line below each heading. The sed only matches release-please's bracketed
+      # form, so it is idempotent: re-running on an already-normalized file (the
+      # usual case, since release-please regenerates the branch on every push)
+      # changes nothing and the step exits without an empty commit.
+      #
+      # Pushes use the App token in the clone URL, not GITHUB_TOKEN, so the
+      # workflow's `permissions: {}` posture is unchanged.
+      - name: Normalize CHANGELOG headings for Home Assistant
+        if: ${{ steps.release.outputs.pr }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_BRANCH: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+        run: |
+          set -euo pipefail
+          git clone --branch "$PR_BRANCH" --depth 1 \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" rp-branch
+          cd rp-branch
+          sed -i -E \
+            's@^(#{2,}) \[([^]]+)\]\(([^)]+)\) \(([0-9]{4}-[0-9]{2}-[0-9]{2})\)$@\1 \2\n\n_\4_ · [Compare](\3)@' \
+            rtl_433/CHANGELOG.md
+          if git diff --quiet; then
+            echo "CHANGELOG headings already Home Assistant-compatible; nothing to do."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "docs: format changelog headings for Home Assistant update notes"
+          git push origin "HEAD:${PR_BRANCH}"
