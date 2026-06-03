@@ -147,7 +147,17 @@ jobs:
       with:
         arch: ${{ matrix.arch }}
         image: ${{ env.REGISTRY_PREFIX }}/${{ matrix.arch }}-${{ matrix.addon }}
-        image-tags: ${{ steps.version.outputs.version }}
+        # Push the version tag plus a stable "cache" tag. build-image verifies
+        # the Cosign signature on cache-image-tag *before* the build to decide
+        # whether it can reuse that image as a registry build cache. Pointing it
+        # at the per-build version tag means the tag never exists yet, so the
+        # verify burns ~65s in retry backoff every release. A stable "cache" tag
+        # (re-pushed and signed each build) verifies in ~1s and is reused as
+        # build cache. These are internal per-arch images; users pull the
+        # multi-arch manifest, never the "cache" tag.
+        image-tags: |
+          ${{ steps.version.outputs.version }}
+          cache
         version: ${{ steps.version.outputs.version }}
         context: ${{ matrix.addon }}
         build-args: ${{ steps.buildconf.outputs.build_args }}
@@ -156,7 +166,7 @@ jobs:
         push: ${{ inputs.build-type != 'test' }}
         cosign: ${{ inputs.build-type != 'test' }}
         cache-gha-scope: ${{ matrix.addon }}
-        cache-image-tag: ${{ steps.version.outputs.version }}
+        cache-image-tag: cache
 
   # Combine the per-arch images into a single multi-arch manifest per addon and
   # sign it with Cosign. Skipped for "test" builds, which never push images.
