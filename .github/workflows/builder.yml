@@ -1,0 +1,23 @@
+name: Build rtl_433 images
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Test Build
+    uses: ./.github/workflows/build-addon.yml
+    # Permissions required by the reusable workflow
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    with:
+      build-type: test

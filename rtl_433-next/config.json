@@ -1,0 +1,46 @@
+{
+  "name": "rtl_433 (next)",
+  "image": "ghcr.io/rtl-433-hass/rtl_433-next",
+  "version": "next",
+  "slug": "rtl433-next",
+  "stage": "experimental",
+  "description": "Receive wireless sensor data via an SDR dongle and rtl_433",
+  "url": "https://github.com/rtl-433-hass/rtl_433-hass-addons/tree/main/rtl_433-next",
+  "arch": ["aarch64", "amd64"],
+  "init": false,
+  "map": ["addon_config:rw"],
+  "usb": true,
+  "udev": true,
+  "hassio_api": true,
+  "discovery": ["rtl_433"],
+  "options": {
+    "disable_tpms": true,
+    "log_received_messages": false,
+    "log_diagnostic_messages": false,
+    "correct_ppm_offset": false,
+    "detect_noise_floor": false,
+    "noise_floor_bands": "433.92M,868M,915M",
+    "noise_floor_duration": 30
+  },
+  "schema": {
+    "disable_tpms": "bool",
+    "log_received_messages": "bool",
+    "log_diagnostic_messages": "bool",
+    "correct_ppm_offset": "bool",
+    "detect_noise_floor": "bool",
+    "noise_floor_bands": "str",
+    "noise_floor_duration": "int(1,600)"
+  },
+  "ports": {
+    "8433/tcp": 8433,
+    "8434/tcp": 8434,
+    "8435/tcp": 8435,
+    "8436/tcp": 8436,
+    "8437/tcp": 8437,
+    "8438/tcp": 8438,
+    "8439/tcp": 8439,
+    "8440/tcp": 8440,
+    "8441/tcp": 8441,
+    "8442/tcp": 8442
+  }
+}
