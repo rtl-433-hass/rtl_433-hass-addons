@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.1
+
+_2026-06-03_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.7.0...v0.7.1)
+
+
+### Bug Fixes
+
+* **rtl_433:** make randomize_default_serial a one-shot flash-and-halt step ([#95](https://github.com/rtl-433-hass/rtl_433-hass-addons/issues/95)) ([f8db098](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/f8db0985468c7682f129d00b93f81dc93b9975e9))
+
 ## 0.7.0
 
 _2026-06-03_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.6.1...v0.7.0)
