@@ -17,8 +17,8 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 - `chore:` maintenance (deps, etc.)
 - `revert:` reverting changes
 
-Commits that only touch AI task-manager artifacts under `.ai/task-manager/`
-(plans, tasks, blueprints, execution summaries, archival) use `chore` (e.g.
+Commits that only touch Strikethroo (formerly AI Task Manager) artifacts under
+`.ai/strikethroo/` (plans, tasks, blueprints, execution summaries, archival) use `chore` (e.g.
 `chore(tasks): ...`), **not** `docs`. The `docs` type is reserved for changes to
 human- or assistant-facing documentation such as `README.md` or this file.
 
