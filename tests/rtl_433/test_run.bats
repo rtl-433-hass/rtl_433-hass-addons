@@ -92,6 +92,77 @@ EOF
     [ "${lines[1]}" = "$(printf '1\tcafe1234')" ]
 }
 
+# Regression: some librtlsdr builds list devices in the banner WITHOUT a serial
+# (just "  0:  Generic RTL2832U OEM"). The old SN-only regex matched nothing, so
+# the flasher saw zero factory-default dongles. Each such row must fall back to
+# opening the device by index to read its serial.
+@test "enumerate_rtlsdr_by_index opens devices when the banner omits the serial" {
+    list_rtlsdr_banner() {
+        cat <<'EOF'
+Found 3 device(s):
+  0:  Generic RTL2832U OEM
+  1:  Generic RTL2832U OEM
+  2:  Generic RTL2832U OEM
+EOF
+    }
+    # The fallback opens 'rtl_eeprom -d <idx>' and parses 'Serial number:'.
+    read_rtlsdr_serial_by_index() {
+        case "$1" in
+            0) printf '00000001' ;;
+            1) printf '00000001' ;;
+            2) printf 'deadbeef' ;;
+        esac
+    }
+    run enumerate_rtlsdr_by_index
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "$(printf '0\t00000001')" ]
+    [ "${lines[1]}" = "$(printf '1\t00000001')" ]
+    [ "${lines[2]}" = "$(printf '2\tdeadbeef')" ]
+}
+
+# A banner mixing SN-bearing and SN-less rows must read each correctly: the
+# fast path off the banner, the fallback by opening the device.
+@test "enumerate_rtlsdr_by_index mixes banner serials and opened-device serials" {
+    list_rtlsdr_banner() {
+        cat <<'EOF'
+Found 2 device(s):
+  0:  Generic RTL2832U OEM
+  1:  Realtek, RTL2832U, SN: deadbeef
+EOF
+    }
+    read_rtlsdr_serial_by_index() { [ "$1" = "0" ] && printf '00000001'; }
+    run enumerate_rtlsdr_by_index
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "$(printf '0\t00000001')" ]
+    [ "${lines[1]}" = "$(printf '1\tdeadbeef')" ]
+}
+
+@test "read_rtlsdr_serial_by_index extracts the serial from the config dump" {
+    timeout() { shift; "$@"; }
+    rtl_eeprom() {
+        cat <<'EOF'
+Found 3 device(s):
+  0:  Generic RTL2832U OEM
+
+Using device 0: Generic RTL2832U OEM
+Found Rafael Micro R820T tuner
+
+Current configuration:
+__________________________________________
+Vendor ID:		0x0bda
+Product ID:		0x2838
+Manufacturer:		Realtek
+Product:		RTL2838UHIDIR
+Serial number:		00000001
+Serial number enabled:	yes
+__________________________________________
+EOF
+    }
+    run read_rtlsdr_serial_by_index 0
+    [ "$status" -eq 0 ]
+    [ "$output" = "00000001" ]
+}
+
 @test "_portpath_for_serial returns the port path for a unique serial" {
     rtlsdr_devices=(
         "$(printf 'deadbeef\t1-1.2')"

@@ -126,6 +126,20 @@ list_rtlsdr_banner() {
     timeout 15 rtl_eeprom 2>&1
 }
 
+# Read one dongle's USB serial by opening it through its librtlsdr index. Some
+# librtlsdr builds list devices in the enumeration banner WITHOUT a serial (just
+# "  0:  Generic RTL2832U OEM"); the serial only appears once the device is
+# opened, in rtl_eeprom's 'Current configuration' dump as a 'Serial number:'
+# line. Opening by '-d <index>' resolves the index through the SAME librtlsdr
+# path the EEPROM write uses, so the serial read here and the serial written by
+# the flasher target the same dongle. Prints the serial (empty if none); the
+# timeout guards a wedged read and a non-zero exit is tolerated. Args: <index>.
+read_rtlsdr_serial_by_index() {
+    timeout 15 rtl_eeprom -d "$1" 2>&1 \
+        | sed -n 's/^Serial number:[[:space:]]*\([^[:space:]]*\).*/\1/p' \
+        | head -n 1
+}
+
 # Print librtlsdr's OWN device enumeration, one "index<TAB>serial" line per
 # device, in the exact order that 'rtl_eeprom -d <index>' / 'rtl_test -d <index>'
 # resolve. librtlsdr derives this index from libusb's device list, which is NOT
@@ -134,13 +148,19 @@ list_rtlsdr_banner() {
 # it writes is the same dongle whose serial it inspected. A blank serial (no USB
 # serial descriptor) is preserved as an empty field.
 enumerate_rtlsdr_by_index() {
-    local line
+    local line idx
     while IFS= read -r line
     do
         # Banner rows look like "  0:  Realtek, RTL2838UHIDIR, SN: 00000001".
         if [[ "$line" =~ ^[[:space:]]*([0-9]+):.*SN:[[:space:]]*([^[:space:],]*) ]]
         then
             printf '%s\t%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+        # Other builds omit the serial from the banner ("  0:  Generic RTL2832U
+        # OEM"); fall back to opening the device to read its serial directly.
+        elif [[ "$line" =~ ^[[:space:]]*([0-9]+): ]]
+        then
+            idx="${BASH_REMATCH[1]}"
+            printf '%s\t%s\n' "$idx" "$(read_rtlsdr_serial_by_index "$idx")"
         fi
     done < <(list_rtlsdr_banner)
 }
