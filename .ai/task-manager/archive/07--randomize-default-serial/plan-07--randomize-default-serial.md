@@ -184,3 +184,28 @@ After each phase, run the relevant validators (`python3 tests/config/validate_co
 ### Execution Summary
 - Total Phases: 3
 - Total Tasks: 4
+
+---
+
+## Execution Summary
+
+**Status**: ✅ Completed Successfully
+**Completed Date**: 2026-06-03
+
+### Results
+Delivered the opt-in `randomize_default_serial` add-on option across all four planned deliverables:
+- **Config surface** (Task 1): the boolean option (default `false`, schema `bool`) added to both `rtl_433/config.json` and `rtl_433-next/config.json`; config validator passes.
+- **Implementation** (Task 2): two pure helpers (`_serial_is_default`, `generate_random_serial`) plus a best-effort startup pass in `main()` that flashes a unique random 8-hex serial onto each factory-default dongle via `rtl_eeprom` (addressed by enumeration index, confirmation auto-answered, `timeout`-bounded), then re-enumerates `rtlsdr_devices` exactly once. Placed after enumeration and before the PPM pre-pass; idempotent and guarded so a missing `rtl_eeprom` or a failed write never blocks startup.
+- **Tests** (Task 3): 3 new BATS cases (suite now 38/38 passing) covering the default predicate and the serial generator format.
+- **Docs** (Task 4): a new "Randomize default serial" README subsection (one-time/idempotent nature + re-enumeration caveat), a cross-reference from the existing manual `rtl_eeprom` note, and a brief `-next` mention.
+
+Each phase was committed separately with Conventional Commit messages.
+
+### Noteworthy Events
+- Execution ran on the pre-existing `feat/report-level-data` branch (not `main`); per the PRE_PHASE hook, the feature-branch script proceeded without creating a new branch.
+- One permitted deviation in Task 2: used `for _ in 1 2 3 4 5` instead of `_attempt` to avoid any SC2034 concern; shellcheck is clean.
+- The hardware-touching flash/re-enumeration path is intentionally not unit-tested (requires a real USB reset); it is covered by the plan's static-trace self-validation instead.
+
+### Necessary follow-ups
+- None required. Optionally, a maintainer could add `randomize_default_serial` to `RADIO_OPT_OPTIONS` in `tests/config/validate_configs.py` to pin its default/type explicitly, but the existing options↔schema parity check already guards it.
+- The CHANGELOG is intentionally left to release-please.
