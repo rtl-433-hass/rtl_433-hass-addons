@@ -73,13 +73,23 @@ jobs:
       #
       # Pushes use the App token in the clone URL, not GITHUB_TOKEN, so the
       # workflow's `permissions: {}` posture is unchanged.
+      #
+      # This only runs when release-please opened/updated a release PR. On a
+      # release-creation run (the PR was merged, a tag was cut) there is no PR
+      # and nothing to normalize -- the CHANGELOG was already normalized in the
+      # PR that just merged. The `if:` skips the step then, but GitHub still
+      # evaluates a step's `env:` even when its `if:` is false, so the PR JSON
+      # is passed through verbatim and parsed with jq in the script. Calling
+      # `fromJSON()` on the empty `outputs.pr` string in an `env:` expression
+      # raises a template error and fails the whole release run.
       - name: Normalize CHANGELOG headings for Home Assistant
         if: ${{ steps.release.outputs.pr }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          PR_BRANCH: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+          PR_JSON: ${{ steps.release.outputs.pr }}
         run: |
           set -euo pipefail
+          PR_BRANCH="$(printf '%s' "$PR_JSON" | jq -r '.headBranchName')"
           git clone --branch "$PR_BRANCH" \
             "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" rp-branch
           cd rp-branch
