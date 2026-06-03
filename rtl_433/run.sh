@@ -113,6 +113,59 @@ enumerate_rtlsdr_devices() {
     done | sort -t"$(printf '\t')" -k2,2 -V
 }
 
+# Emit librtlsdr's device-enumeration banner (stdout+stderr merged). Factored out
+# as a one-liner so tests can stub the hardware call. Both rtl_eeprom and rtl_test
+# print a banner like:
+#     Found 2 device(s):
+#       0:  Realtek, RTL2838UHIDIR, SN: 00000001
+#       1:  Realtek, RTL2832U, SN: deadbeef
+# rtl_eeprom prints it for ALL devices and then exits after reading device 0 (no
+# sampling loop), so it is the cheap lister; the timeout only guards a wedged read
+# and never truncates the banner, which is flushed before device 0 is opened.
+list_rtlsdr_banner() {
+    timeout 15 rtl_eeprom 2>&1
+}
+
+# Print librtlsdr's OWN device enumeration, one "index<TAB>serial" line per
+# device, in the exact order that 'rtl_eeprom -d <index>' / 'rtl_test -d <index>'
+# resolve. librtlsdr derives this index from libusb's device list, which is NOT
+# guaranteed to match enumerate_rtlsdr_devices' port-path sort. Any pass that
+# writes by '-d <index>' (the EEPROM flasher) MUST use this ordering so the index
+# it writes is the same dongle whose serial it inspected. A blank serial (no USB
+# serial descriptor) is preserved as an empty field.
+enumerate_rtlsdr_by_index() {
+    local line
+    while IFS= read -r line
+    do
+        # Banner rows look like "  0:  Realtek, RTL2838UHIDIR, SN: 00000001".
+        if [[ "$line" =~ ^[[:space:]]*([0-9]+):.*SN:[[:space:]]*([^[:space:],]*) ]]
+        then
+            printf '%s\t%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+        fi
+    done < <(list_rtlsdr_banner)
+}
+
+# Best-effort: print the sysfs port path of the connected dongle carrying the
+# given serial, but ONLY when exactly one dongle has it. Factory-default/empty
+# serials are shared by multiple dongles (or unset), so they resolve to nothing —
+# the flasher then logs by librtlsdr index alone. Reads the 'rtlsdr_devices'
+# array. Args: <serial>.
+_portpath_for_serial() {
+    local serial="$1" entry s count=0 found=""
+    [ -n "$serial" ] || return 0
+    for entry in "${rtlsdr_devices[@]}"
+    do
+        s="${entry%%$'\t'*}"
+        if [ "$s" = "$serial" ]
+        then
+            count=$((count + 1))
+            found="${entry#*$'\t'}"
+        fi
+    done
+    [ "$count" -eq 1 ] && printf '%s' "$found"
+    return 0
+}
+
 # Decide whether a USB serial is usable as a stable identifier. A serial only
 # counts when it is present, not a known factory default/placeholder, not a
 # short reserved integer (which collides with the device index), and unique
@@ -151,6 +204,73 @@ _serial_is_default() {
 # serial (see the flashing pass in main()).
 generate_random_serial() {
     od -An -N4 -tx1 /dev/urandom | tr -dc '0-9a-f'
+}
+
+# One-time maintenance pass for the 'randomize_default_serial' option: give every
+# factory-default dongle a unique random serial via 'rtl_eeprom -d <index>'.
+#
+# CRITICAL: the loop is driven by enumerate_rtlsdr_by_index (librtlsdr's own
+# index order), NOT the sysfs 'rtlsdr_devices' array (port-path order). The two
+# orderings can disagree, and 'rtl_eeprom -d <index>' resolves the index through
+# librtlsdr — so iterating the sysfs array and passing its array index as '-d'
+# would inspect one dongle's serial but write to whichever dongle librtlsdr calls
+# that index, flashing the wrong radio. Reading the index and serial from the
+# same enumeration that the write targets keeps them in lock-step.
+#
+# Reads the 'rtlsdr_devices' array only to (a) seed the set of serials to avoid
+# and (b) resolve a port path for the log line. Prints the number of dongles
+# flashed to stdout; all human-facing messages go through bashio (stderr).
+flash_default_serials() {
+    local existing_serials=" " entry idx serial portpath new_serial cand
+    local flashed_count=0
+
+    # Serials already present on a connected dongle, plus any picked earlier in
+    # this same pass, so a freshly generated serial can never collide.
+    for entry in "${rtlsdr_devices[@]}"
+    do
+        existing_serials+="${entry%%$'\t'*} "
+    done
+
+    while IFS=$'\t' read -r idx serial
+    do
+        [ -n "$idx" ] || continue
+        [ "$idx" -ge "$MAX_RADIOS" ] && continue
+        # Only touch dongles that still carry a factory-default serial; a dongle
+        # with a real serial is left alone.
+        _serial_is_default "$serial" || continue
+
+        portpath="$(_portpath_for_serial "$serial")"
+
+        # Pick a random serial not already present or assigned this pass.
+        new_serial=""
+        for _ in 1 2 3 4 5
+        do
+            cand="$(generate_random_serial)"
+            case "$existing_serials" in
+                *" ${cand} "*) continue ;;
+            esac
+            new_serial="$cand"
+            break
+        done
+        if [ -z "$new_serial" ]
+        then
+            bashio::log.warning "Radio at index ${idx}${portpath:+ (${portpath})}: could not generate a unique serial; leaving its default serial unchanged."
+            continue
+        fi
+
+        bashio::log.info "Radio at index ${idx}${portpath:+ (${portpath})}: writing random serial ${new_serial} to EEPROM (was default '${serial}')."
+        # rtl_eeprom prompts for confirmation; auto-answer 'y' and bound the call
+        # so a stuck write cannot hang startup. A non-zero exit is tolerated.
+        if printf 'y\n' | timeout 30 rtl_eeprom -d "$idx" -s "$new_serial" >/dev/null 2>&1
+        then
+            existing_serials+="${new_serial} "
+            flashed_count=$((flashed_count + 1))
+        else
+            bashio::log.warning "Radio at index ${idx}: rtl_eeprom failed to write serial ${new_serial} (non-fatal)."
+        fi
+    done < <(enumerate_rtlsdr_by_index)
+
+    printf '%s' "$flashed_count"
 }
 
 # Resolve a stable unique identifier for one radio. Args: <device_value> <tag>.
@@ -558,53 +678,7 @@ main() {
         then
             bashio::log.warning "randomize_default_serial is on but rtl_eeprom is not available; no serials can be written."
         else
-            # Space-padded set of serials to avoid assigning (those already present
-            # on a connected dongle, plus any picked earlier in this same pass).
-            existing_serials=" "
-            for entry in "${rtlsdr_devices[@]}"
-            do
-                existing_serials+="${entry%%$'\t'*} "
-            done
-
-            for i in "${!rtlsdr_devices[@]}"
-            do
-                [ "$i" -ge "$MAX_RADIOS" ] && break
-                entry="${rtlsdr_devices[$i]}"
-                serial="${entry%%$'\t'*}"
-                portpath="${entry#*$'\t'}"
-                # Only touch dongles that still carry a factory-default serial; a
-                # dongle with a real serial is left alone.
-                _serial_is_default "$serial" || continue
-
-                # Pick a random serial not already present or assigned this pass.
-                new_serial=""
-                for _ in 1 2 3 4 5
-                do
-                    cand="$(generate_random_serial)"
-                    case "$existing_serials" in
-                        *" ${cand} "*) continue ;;
-                    esac
-                    new_serial="$cand"
-                    break
-                done
-                if [ -z "$new_serial" ]
-                then
-                    bashio::log.warning "Radio at ${portpath}: could not generate a unique serial; leaving its default serial unchanged."
-                    continue
-                fi
-
-                bashio::log.info "Radio at ${portpath} (index ${i}): writing random serial ${new_serial} to EEPROM (was default '${serial}')."
-                # rtl_eeprom prompts for confirmation; auto-answer 'y' and bound
-                # the call so a stuck write cannot hang startup. A non-zero exit
-                # is tolerated (best-effort).
-                if printf 'y\n' | timeout 30 rtl_eeprom -d "$i" -s "$new_serial" >/dev/null 2>&1
-                then
-                    existing_serials+="${new_serial} "
-                    flashed_count=$((flashed_count + 1))
-                else
-                    bashio::log.warning "Radio at ${portpath}: rtl_eeprom failed to write serial ${new_serial} (non-fatal)."
-                fi
-            done
+            flashed_count="$(flash_default_serials)"
         fi
 
         bashio::log.info "============================================================"
