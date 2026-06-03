@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.5.0...v0.6.0) (2026-06-03)
+
+
+### Features
+
+* **rtl_433:** emit signal level data (-M level) in decoded events ([efac922](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/efac9227b00604409262210ccfd1afd58ad41d15))
+
 ## [0.5.0](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.4.0...v0.5.0) (2026-06-03)
 
 
