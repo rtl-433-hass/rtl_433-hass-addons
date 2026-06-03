@@ -1,0 +1,51 @@
+# Single-branch workflow:
+# - Push to main: Builds -next addons (development channel)
+# - Push tag (v*): Builds stable addons (production channel)
+# - Daily schedule: Builds -next addons with latest upstream rtl_433
+#
+# Stable release tags are created by release-please (see release-please.yml)
+# when a release PR merges, in the form v<semver> (e.g. v0.1.1).
+name: Create new rtl_433 addon release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  schedule:
+    # A random daily time, as Actions doesn't have a suggestion for running
+    # daily without causing job spikes.
+    - cron: '16 8 * * *'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Build stable addons only when a tag is pushed
+  release:
+    name: Release Build
+    if: github.ref_type == 'tag'
+    uses: ./.github/workflows/build-addon.yml
+    # Permissions required by the reusable workflow
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    with:
+      build-type: release
+
+  # Build -next addons on push to main or daily schedule
+  development:
+    name: Development Build
+    if: github.ref_type != 'tag'
+    uses: ./.github/workflows/build-addon.yml
+    # Permissions required by the reusable workflow
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    with:
+      build-type: nightly
+      skip-tag-check: true

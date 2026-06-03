@@ -1,0 +1,44 @@
+name: Smoke Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Build rtl_433 image
+        run: |
+          docker build \
+            --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.21 \
+            --tag rtl_433-test:latest ./rtl_433
+      - name: rtl_433 binary exists
+        run: docker run --rm rtl_433-test:latest which rtl_433
+      - name: rtl_test binary exists
+        run: docker run --rm rtl_433-test:latest which rtl_test
+      - name: rtl_power binary exists
+        run: docker run --rm rtl_433-test:latest which rtl_power
+      - name: gnuplot binary exists
+        run: docker run --rm rtl_433-test:latest which gnuplot
+      - name: rtl_433 --help runs
+        run: |
+          out=$(docker run --rm rtl_433-test:latest rtl_433 --help 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -qi "Receive frequency"
+      - name: rtl_433 lists protocols
+        run: docker run --rm rtl_433-test:latest rtl_433 -R help 2>&1 | head -20
+      - name: run.sh is executable
+        run: docker run --rm rtl_433-test:latest test -x /run.sh
+      - name: baked-in default config exists
+        run: docker run --rm rtl_433-test:latest test -f /etc/rtl_433/rtl_433.defaults.conf
+      - name: TPMS disables config is present and non-empty
+        run: |
+          docker run --rm rtl_433-test:latest sh -c \
+            'test -s /etc/rtl_433/rtl_433.tpms-disables.conf && grep -q "^protocol -" /etc/rtl_433/rtl_433.tpms-disables.conf'
