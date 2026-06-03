@@ -63,6 +63,112 @@ make_usb_dev() {
     [ -z "$output" ]
 }
 
+# --- enumerate_rtlsdr_by_index / flash_default_serials -----------------------
+
+@test "enumerate_rtlsdr_by_index parses the librtlsdr banner into index<TAB>serial" {
+    list_rtlsdr_banner() {
+        cat <<'EOF'
+Found 2 device(s):
+  0:  Realtek, RTL2838UHIDIR, SN: 00000001
+  1:  Realtek, RTL2832U, SN: deadbeef
+EOF
+    }
+    run enumerate_rtlsdr_by_index
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "$(printf '0\t00000001')" ]
+    [ "${lines[1]}" = "$(printf '1\tdeadbeef')" ]
+}
+
+@test "enumerate_rtlsdr_by_index preserves a blank serial field" {
+    list_rtlsdr_banner() {
+        cat <<'EOF'
+  0:  Realtek, RTL2838UHIDIR, SN:
+  1:  Realtek, RTL2832U, SN: cafe1234
+EOF
+    }
+    run enumerate_rtlsdr_by_index
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "$(printf '0\t')" ]
+    [ "${lines[1]}" = "$(printf '1\tcafe1234')" ]
+}
+
+@test "_portpath_for_serial returns the port path for a unique serial" {
+    rtlsdr_devices=(
+        "$(printf 'deadbeef\t1-1.2')"
+        "$(printf 'cafe1234\t1-1.4')"
+    )
+    run _portpath_for_serial "cafe1234"
+    [ "$status" -eq 0 ]
+    [ "$output" = "1-1.4" ]
+}
+
+@test "_portpath_for_serial returns nothing for a duplicated or empty serial" {
+    rtlsdr_devices=(
+        "$(printf '00000001\t1-1.2')"
+        "$(printf '00000001\t1-1.4')"
+    )
+    run _portpath_for_serial "00000001"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    run _portpath_for_serial ""
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+# Regression for the wrong-radio EEPROM write: the sysfs port-path order and
+# librtlsdr's index order can disagree, and 'rtl_eeprom -d <index>' resolves the
+# index through librtlsdr. The flasher MUST take both index and serial from
+# librtlsdr's enumeration so the dongle it inspects is the dongle it writes.
+@test "flash_default_serials writes -d to the librtlsdr index, not the sysfs array index" {
+    # sysfs port-path order: the default-serial dongle sits at ARRAY index 1...
+    rtlsdr_devices=(
+        "$(printf 'deadbeef\t1-1.2')"
+        "$(printf '00000001\t1-1.4')"
+    )
+    # ...but librtlsdr enumerates that same default dongle at INDEX 0.
+    list_rtlsdr_banner() {
+        cat <<'EOF'
+Found 2 device(s):
+  0:  Realtek, RTL2838UHIDIR, SN: 00000001
+  1:  Realtek, RTL2832U, SN: deadbeef
+EOF
+    }
+    # 'timeout' is an external binary that cannot see our rtl_eeprom function;
+    # stub it to drop the duration and exec the rest.
+    timeout() { shift; "$@"; }
+    generate_random_serial() { printf 'a1b2c3d4'; }
+    bashio::log.info()    { :; }
+    bashio::log.warning() { :; }
+    RTL_EEPROM_LOG="$BATS_TEST_TMPDIR/eeprom.args"
+    : > "$RTL_EEPROM_LOG"
+    rtl_eeprom() { printf '%s\n' "$*" >> "$RTL_EEPROM_LOG"; }
+
+    run flash_default_serials
+    [ "$status" -eq 0 ]
+    [ "$output" = "1" ]                                   # exactly one dongle flashed
+    # Wrote to librtlsdr index 0 (the default dongle), NOT array index 1.
+    [ "$(cat "$RTL_EEPROM_LOG")" = "-d 0 -s a1b2c3d4" ]
+}
+
+@test "flash_default_serials leaves non-default dongles untouched" {
+    rtlsdr_devices=("$(printf 'deadbeef\t1-1.2')")
+    list_rtlsdr_banner() {
+        printf 'Found 1 device(s):\n  0:  Realtek, RTL2832U, SN: deadbeef\n'
+    }
+    timeout() { shift; "$@"; }
+    generate_random_serial() { printf 'a1b2c3d4'; }
+    bashio::log.info()    { :; }
+    bashio::log.warning() { :; }
+    RTL_EEPROM_LOG="$BATS_TEST_TMPDIR/eeprom.args"
+    : > "$RTL_EEPROM_LOG"
+    rtl_eeprom() { printf '%s\n' "$*" >> "$RTL_EEPROM_LOG"; }
+
+    run flash_default_serials
+    [ "$status" -eq 0 ]
+    [ "$output" = "0" ]                                   # nothing flashed
+    [ ! -s "$RTL_EEPROM_LOG" ]                            # rtl_eeprom never called
+}
+
 # --- _serial_is_usable -------------------------------------------------------
 
 @test "_serial_is_usable rejects placeholders, short ints, empty, and duplicates" {
