@@ -127,24 +127,33 @@ The `<id>` is the radio's identifier (the same one used for override files). Bec
 
 Nearly all RTL-SDR dongles ship with the same factory-default serial
 (`00000000` or `00000001`), which makes multiple dongles indistinguishable and
-pushes the add-on to identify them by USB port instead. The **Randomize default
-serial** option (on by default) fixes this automatically: at startup, before
-any radio claims a device, the add-on flashes a **unique random 8-hex-character
-serial** onto every connected dongle that still carries a factory-default
-serial, using `rtl_eeprom`. Dongles that already have a real serial are never
-touched.
+pushes the add-on to identify them by USB port instead. When the add-on detects
+a default-serial dongle it logs a warning recommending you assign it a unique
+serial with the **Randomize default serial** option (off by default).
 
-This is a **one-time** operation: once a dongle has been given a serial it is no
-longer a factory default, so later boots find nothing to flash (even with the
-option left on) — a dongle is never re-flashed. After flashing, the add-on
-re-enumerates the dongles **once** so the new serials are used for the rest of
-that same boot — for identity, override-file matching, and launch.
+This option is a **one-time maintenance step**, not a normal runtime setting,
+because applying a new serial requires physically replugging the dongle:
+`rtl_eeprom` writes the serial to the dongle's EEPROM, but the RTL2832U only
+reads its serial at USB power-on, and the add-on's container cannot power-cycle
+the USB bus. So when the option is **on**, the add-on writes a **unique random
+8-hex-character serial** to every connected default-serial dongle and then
+**stops — it does not start `rtl_433`** — printing instructions to the log.
 
-**Caveat:** applying a new serial requires the dongle to re-enumerate (a USB
-reset). The EEPROM write always persists, but if the reset does not propagate
-inside the container on the first boot, the freshly assigned serial simply takes
-effect on the **next add-on restart**. Every step is best-effort: a failure to
-flash or re-enumerate never stops the radio (or the add-on) from starting.
+To assign serials to your dongles:
+
+1. Turn **on** *Randomize default serial* and (re)start the add-on. It writes new
+   serials to any factory-default dongles, then halts without starting `rtl_433`.
+2. Turn the option back **off**.
+3. **Stop** the add-on.
+4. **Unplug and replug** the RTL-SDR dongle(s) (or power-cycle the USB hub) so
+   they re-read their new serials.
+5. **Start** the add-on again — each dongle now reports its unique serial and is
+   identified by it (stable across USB-port changes).
+
+Dongles that already have a real serial are never touched. Every step is
+best-effort: a missing `rtl_eeprom` or a failed/rejected write is logged and
+skipped. Leaving the option on simply keeps the add-on in this maintenance mode
+(no radios start), so remember to turn it back off when you're done.
 
 ### Non-RTL-SDR radios (SoapySDR / HackRF)
 
