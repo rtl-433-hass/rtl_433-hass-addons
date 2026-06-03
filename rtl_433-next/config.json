@@ -14,6 +14,7 @@
   "hassio_api": true,
   "discovery": ["rtl_433"],
   "options": {
+    "randomize_default_serial": true,
     "disable_tpms": true,
     "log_received_messages": false,
     "log_diagnostic_messages": false,
@@ -23,6 +24,7 @@
     "noise_floor_duration": 30
   },
   "schema": {
+    "randomize_default_serial": "bool",
     "disable_tpms": "bool",
     "log_received_messages": "bool",
     "log_diagnostic_messages": "bool",

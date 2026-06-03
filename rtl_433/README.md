@@ -22,7 +22,7 @@ Each discovery message carries a stable `unique_id` so the integration can keep 
  2. otherwise the dongle's **USB port path** — which physical port it is plugged into (stable as long as the dongle stays in that port);
  3. otherwise the **configuration template's name** (a deterministic last resort for devices the add-on can't match to a USB RTL-SDR entry, such as SoapySDR/HackRF devices).
 
-Because nearly all RTL-SDR dongles ship with the same default serial (`00000001`), multi-dongle setups get the most stable identity either by keeping each dongle in a fixed USB port or by flashing a unique serial with `rtl_eeprom -s <serial>` (a one-time step performed outside the add-on).
+Because nearly all RTL-SDR dongles ship with the same default serial (`00000001`), multi-dongle setups get the most stable identity either by keeping each dongle in a fixed USB port or by flashing a unique serial with `rtl_eeprom -s <serial>` (a one-time step performed outside the add-on) — or enable the [Randomize default serial](#randomize-default-serial) option to have the add-on do this automatically.
 
 ## Prerequisites
 
@@ -122,6 +122,29 @@ While the option is on, every radio is swept with `rtl_power` **on every boot** 
 The `<id>` is the radio's identifier (the same one used for override files). Because the files are timestamped, each boot produces a new set; **the add-on never deletes old reports**, so clean them up yourself when you no longer need them. A one-line per-band summary is also written to the add-on log. Unlike the parallel PPM measurement above, **radios are scanned one after another, and startup is paused for each** — so the added startup per radio is roughly **Noise floor duration × the number of bands** (plus a little device setup). With the defaults (30 seconds × 3 bands) that's about **90 seconds per radio**; lower **Noise floor duration** for a quicker scan or raise it for a more thorough interference survey.
 
 **Important:** the noise floor reported here is a **boot-time snapshot taken at the configured band(s)**, not at whatever frequency Home Assistant is using at runtime. The rtl_433 integration can retune a radio after boot, so the live operating frequency may differ from the band(s) measured here. Treat the report as a point-in-time survey of the configured bands, not a continuous measurement of the radio's current frequency.
+
+### Randomize default serial
+
+Nearly all RTL-SDR dongles ship with the same factory-default serial
+(`00000000` or `00000001`), which makes multiple dongles indistinguishable and
+pushes the add-on to identify them by USB port instead. The **Randomize default
+serial** option (on by default) fixes this automatically: at startup, before
+any radio claims a device, the add-on flashes a **unique random 8-hex-character
+serial** onto every connected dongle that still carries a factory-default
+serial, using `rtl_eeprom`. Dongles that already have a real serial are never
+touched.
+
+This is a **one-time** operation: once a dongle has been given a serial it is no
+longer a factory default, so later boots find nothing to flash (even with the
+option left on) — a dongle is never re-flashed. After flashing, the add-on
+re-enumerates the dongles **once** so the new serials are used for the rest of
+that same boot — for identity, override-file matching, and launch.
+
+**Caveat:** applying a new serial requires the dongle to re-enumerate (a USB
+reset). The EEPROM write always persists, but if the reset does not propagate
+inside the container on the first boot, the freshly assigned serial simply takes
+effect on the **next add-on restart**. Every step is best-effort: a failure to
+flash or re-enumerate never stops the radio (or the add-on) from starting.
 
 ### Non-RTL-SDR radios (SoapySDR / HackRF)
 

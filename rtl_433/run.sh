@@ -132,6 +132,27 @@ _serial_is_usable() {
     [ "$count" -le 1 ]
 }
 
+# Decide whether a USB serial is a factory-default placeholder that the
+# randomize_default_serial option should replace. This is intentionally
+# narrower than _serial_is_usable: it matches only the empty/missing serial and
+# the two well-known factory defaults, not every technically-unusable value.
+# Args: <serial>.
+_serial_is_default() {
+    local serial="$1"
+    case "$serial" in
+        ""|00000000|00000001) return 0 ;;
+    esac
+    return 1
+}
+
+# Print a random 8-character lowercase-hex serial drawn from the kernel entropy
+# source. Used to give a factory-default dongle a unique identity. The caller is
+# responsible for rejecting a value that collides with an existing/just-assigned
+# serial (see the flashing pass in main()).
+generate_random_serial() {
+    od -An -N4 -tx1 /dev/urandom | tr -dc '0-9a-f'
+}
+
 # Resolve a stable unique identifier for one radio. Args: <device_value> <tag>.
 # Reads the enumerated 'rtlsdr_devices' array. Layered strategy:
 #   1. usable serial      -> 'serial:<serial>'  (survives moving USB ports)
@@ -484,6 +505,16 @@ main() {
         detect_noise_floor="true"
     fi
 
+    # Read the "Randomize default serial" add-on option (default off). When true,
+    # every detected dongle still carrying a factory-default serial is flashed
+    # with a unique random serial via rtl_eeprom before any process claims it,
+    # then the dongles are re-enumerated once. When false, none of this runs.
+    randomize_default_serial="false"
+    if bashio::config.true 'randomize_default_serial'
+    then
+        randomize_default_serial="true"
+    fi
+
     # Center frequencies swept when detect_noise_floor is on (see parse_noise_bands
     # for the accepted forms). Falls back to the common ISM bands when unset/empty.
     noise_floor_bands="$(bashio::config 'noise_floor_bands')"
@@ -509,6 +540,75 @@ main() {
     # Enumerate RTL-SDR dongles once so each radio's identifier can be resolved from
     # real hardware (serial / USB port path) rather than the unstable device index.
     mapfile -t rtlsdr_devices < <(enumerate_rtlsdr_devices)
+
+    # Optionally normalise factory-default serials before anything claims a
+    # device. rtl_eeprom writes persist and reset the dongle (triggering kernel
+    # re-enumeration), so flash every default-serial dongle up front and then
+    # re-enumerate once so the freshly assigned serials are used for identity,
+    # override matching, PPM, noise-floor, and launch. Best-effort throughout: a
+    # missing rtl_eeprom or a failed/ineffective flash is warned and the dongle
+    # keeps whatever identity it had.
+    if [ "$randomize_default_serial" = "true" ] && [ "${#rtlsdr_devices[@]}" -gt 0 ]
+    then
+        if ! command -v rtl_eeprom >/dev/null 2>&1
+        then
+            bashio::log.warning "randomize_default_serial is on but rtl_eeprom is not available; skipping serial randomization."
+        else
+            flashed_any="false"
+            # Space-padded set of serials to avoid (already present + assigned).
+            existing_serials=" "
+            for entry in "${rtlsdr_devices[@]}"
+            do
+                existing_serials+="${entry%%$'\t'*} "
+            done
+            for i in "${!rtlsdr_devices[@]}"
+            do
+                [ "$i" -ge "$MAX_RADIOS" ] && break
+                entry="${rtlsdr_devices[$i]}"
+                serial="${entry%%$'\t'*}"
+                _serial_is_default "$serial" || continue
+
+                # Pick a random serial not already present or assigned this pass.
+                new_serial=""
+                for _ in 1 2 3 4 5
+                do
+                    cand="$(generate_random_serial)"
+                    case "$existing_serials" in
+                        *" ${cand} "*) continue ;;
+                    esac
+                    new_serial="$cand"
+                    break
+                done
+                if [ -z "$new_serial" ]
+                then
+                    bashio::log.warning "Radio at index ${i}: could not generate a unique serial; leaving its default serial unchanged."
+                    continue
+                fi
+
+                bashio::log.info "Radio at index ${i}: flashing random serial ${new_serial} (was default '${serial}')."
+                # rtl_eeprom prompts for confirmation; auto-answer 'y' and bound
+                # the call so a stuck write cannot hang startup. A non-zero exit
+                # is tolerated (best-effort).
+                if printf 'y\n' | timeout 30 rtl_eeprom -d "$i" -s "$new_serial" >/dev/null 2>&1
+                then
+                    existing_serials+="${new_serial} "
+                    flashed_any="true"
+                else
+                    bashio::log.warning "Radio at index ${i}: rtl_eeprom failed to write serial ${new_serial} (non-fatal; keeping default)."
+                fi
+            done
+
+            if [ "$flashed_any" = "true" ]
+            then
+                # The EEPROM write resets the dongle; give the kernel a moment to
+                # re-enumerate, then refresh the device list exactly once so the
+                # new serials flow through the rest of startup.
+                bashio::log.info "Re-enumerating RTL-SDR dongles after serial flash..."
+                sleep 2
+                mapfile -t rtlsdr_devices < <(enumerate_rtlsdr_devices)
+            fi
+        fi
+    fi
 
     # Parallel arrays describing each launched radio. These are populated during port
     # assignment/launch and consumed by the Supervisor discovery step below, which
