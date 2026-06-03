@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.2
+
+_2026-06-03_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.7.1...v0.7.2)
+
+
+### Bug Fixes
+
+* **rtl_433:** flash EEPROM serials by librtlsdr index, not sysfs order ([62231e2](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/62231e2c2e9cee73d05029afbcc8aa6a9922fd19))
+
 ## 0.7.1
 
 _2026-06-03_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.7.0...v0.7.1)
