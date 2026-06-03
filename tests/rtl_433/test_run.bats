@@ -363,3 +363,24 @@ ppm_cache_mocks() {
     [ "$status" -ne 0 ]
     [ -z "$output" ]
 }
+
+# --- baked-in default config: report_meta -----------------------------------
+
+# rtl_433 only colon-combines sub-options within a single meta type, so 'level'
+# must sit on its own 'report_meta' line; combining it with 'time' (e.g.
+# 'report_meta time:... level') silently drops the level data. Guard both the
+# presence of the standalone line and the absence of the broken combined form.
+
+@test "defaults.conf emits 'report_meta level' on its own line" {
+    DEFAULTS="${BATS_TEST_DIRNAME}/../../rtl_433/rtl_433.defaults.conf"
+    grep -Eq '^[[:space:]]*report_meta[[:space:]]+level[[:space:]]*$' "$DEFAULTS"
+}
+
+@test "defaults.conf never combines 'level' with another meta type on one line" {
+    DEFAULTS="${BATS_TEST_DIRNAME}/../../rtl_433/rtl_433.defaults.conf"
+    # A report_meta line carrying 'level' plus any other whitespace-separated
+    # token would drop the level data; assert no such line exists.
+    run grep -En '^[[:space:]]*report_meta[[:space:]]+.*[[:space:]]level([[:space:]]|$)' "$DEFAULTS"
+    [ "$status" -ne 0 ]
+    [ -z "$output" ]
+}
