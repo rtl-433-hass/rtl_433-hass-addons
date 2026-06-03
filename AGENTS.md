@@ -2,6 +2,14 @@
 
 This repository contains Home Assistant add-ons for rtl_433.
 
+## Related Projects
+
+- [merbanan/rtl_433](https://github.com/merbanan/rtl_433) — the upstream rtl_433
+  project this add-on wraps.
+- [rtl-433-hass/rtl_433](https://github.com/rtl-433-hass/rtl_433) — the companion
+  Home Assistant integration in the same organization, which adds the rtl_433
+  devices published by this add-on to Home Assistant.
+
 ## Commit Style
 
 Use [Conventional Commits](https://www.conventionalcommits.org/):
