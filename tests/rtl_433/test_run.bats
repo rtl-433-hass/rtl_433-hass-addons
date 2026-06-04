@@ -644,3 +644,221 @@ ppm_cache_mocks() {
     [ "$status" -eq 0 ]
     [[ "$output" =~ ^[0-9a-f]{8}$ ]]
 }
+
+# --- flash_targeted_serial (force_randomize_serial) --------------------------
+
+# Shared stubs for the targeted-stamp tests: silence bashio, drop 'timeout's
+# duration so it execs our rtl_eeprom function, and record every rtl_eeprom
+# argument vector to $RTL_EEPROM_LOG. The write runs inside 'printf | timeout
+# rtl_eeprom' (a subshell), so the log MUST be a file path (an array would not
+# survive the subshell), mirroring the flash_default_serials tests above.
+targeted_stamp_mocks() {
+    timeout() { shift; "$@"; }
+    bashio::log.info()    { :; }
+    bashio::log.warning() { :; }
+    RTL_EEPROM_LOG="$BATS_TEST_TMPDIR/eeprom.args"
+    : > "$RTL_EEPROM_LOG"
+    rtl_eeprom() { printf '%s\n' "$*" >> "$RTL_EEPROM_LOG"; }
+}
+
+# Regression for PR #98's wrong-radio write: the sysfs port-path order and
+# librtlsdr's index order can DISAGREE, and 'rtl_eeprom -d <index>' resolves the
+# index through librtlsdr. flash_targeted_serial must map the selected port path
+# to the librtlsdr INDEX (via enumerate_rtlsdr_by_index), never the sysfs array
+# position.
+@test "flash_targeted_serial writes -d to the librtlsdr index for the selected port path" {
+    # sysfs sorts 1-1.2 before 1-1.4 (array index 0 / 1)...
+    rtlsdr_devices=( "$(printf 'aaaa1111\t1-1.2')" "$(printf 'bbbb2222\t1-1.4')" )
+    # ...but librtlsdr lists the 1-1.4 dongle (bbbb2222) at INDEX 0.
+    list_rtlsdr_banner() {
+        printf 'Found 2 device(s):\n'
+        printf '  0:  Realtek, RTL2832U, SN: bbbb2222\n'
+        printf '  1:  Realtek, RTL2832U, SN: aaaa1111\n'
+    }
+    targeted_stamp_mocks
+    generate_random_serial() { printf 'feedface'; }
+
+    run flash_targeted_serial "1-1.4"
+    [ "$status" -eq 0 ]
+    [ "$output" = "feedface" ]                            # echoes the new serial
+    # Wrote to librtlsdr index 0 (bbbb2222), NOT sysfs array position 1.
+    grep -q -- "-d 0 -s feedface" "$RTL_EEPROM_LOG"
+    run grep -q -- "-d 1" "$RTL_EEPROM_LOG"
+    [ "$status" -ne 0 ]                                   # never wrote index 1
+}
+
+# The targeted pass is NOT gated on default-only: a dongle whose current serial
+# is a real (non-default) value is still re-stamped. Contrast flash_default_serials,
+# which would skip such a dongle.
+@test "flash_targeted_serial rewrites a dongle whose current serial is non-default" {
+    rtlsdr_devices=( "$(printf 'bbbb2222\t1-1.4')" )
+    list_rtlsdr_banner() {
+        printf 'Found 1 device(s):\n  0:  Realtek, RTL2832U, SN: bbbb2222\n'
+    }
+    targeted_stamp_mocks
+    generate_random_serial() { printf 'a1b2c3d4'; }
+
+    run flash_targeted_serial "1-1.4"
+    [ "$status" -eq 0 ]
+    [ "$output" = "a1b2c3d4" ]
+    [ "$(cat "$RTL_EEPROM_LOG")" = "-d 0 -s a1b2c3d4" ]   # rewrote the non-default dongle
+}
+
+# Refusal guard: a selector matching NO connected dongle writes nothing.
+@test "flash_targeted_serial refuses when the port path matches zero dongles" {
+    rtlsdr_devices=( "$(printf 'bbbb2222\t1-1.4')" )
+    list_rtlsdr_banner() {
+        printf 'Found 1 device(s):\n  0:  Realtek, RTL2832U, SN: bbbb2222\n'
+    }
+    targeted_stamp_mocks
+    generate_random_serial() { printf 'a1b2c3d4'; }
+
+    run flash_targeted_serial "1-1.9"
+    [ "$status" -ne 0 ]
+    [ ! -s "$RTL_EEPROM_LOG" ]                            # rtl_eeprom never called
+}
+
+# Refusal guard: a duplicated port path matches MULTIPLE rows → ambiguous → no write.
+@test "flash_targeted_serial refuses when the port path matches multiple dongles" {
+    rtlsdr_devices=( "$(printf 'aaaa1111\t1-1.4')" "$(printf 'bbbb2222\t1-1.4')" )
+    list_rtlsdr_banner() {
+        printf 'Found 2 device(s):\n'
+        printf '  0:  Realtek, RTL2832U, SN: aaaa1111\n'
+        printf '  1:  Realtek, RTL2832U, SN: bbbb2222\n'
+    }
+    targeted_stamp_mocks
+    generate_random_serial() { printf 'a1b2c3d4'; }
+
+    run flash_targeted_serial "1-1.4"
+    [ "$status" -ne 0 ]
+    [ ! -s "$RTL_EEPROM_LOG" ]
+}
+
+# Refusal guard (sole-default rule): when the selected dongle carries a shared
+# factory default AND two default-serial indices exist in the banner, the target
+# maps to multiple librtlsdr indices → ambiguous → no write.
+@test "flash_targeted_serial refuses a shared-default target that maps to multiple default indices" {
+    # The selector resolves to a single sysfs row (distinct port paths), but that
+    # row's serial is a shared default and the banner shows two default indices.
+    rtlsdr_devices=( "$(printf '00000001\t1-1.2')" "$(printf '00000001\t1-1.4')" )
+    list_rtlsdr_banner() {
+        printf 'Found 2 device(s):\n'
+        printf '  0:  Realtek, RTL2832U, SN: 00000001\n'
+        printf '  1:  Realtek, RTL2832U, SN: 00000001\n'
+    }
+    targeted_stamp_mocks
+    generate_random_serial() { printf 'a1b2c3d4'; }
+
+    run flash_targeted_serial "1-1.4"
+    [ "$status" -ne 0 ]
+    [ ! -s "$RTL_EEPROM_LOG" ]
+}
+
+# A shared-default target IS stamped when exactly one default index exists (the
+# sole-default rule's accept case), confirming the guard above refuses on
+# ambiguity, not on default-ness alone.
+@test "flash_targeted_serial stamps a sole-default target" {
+    rtlsdr_devices=( "$(printf 'bbbb2222\t1-1.2')" "$(printf '00000001\t1-1.4')" )
+    list_rtlsdr_banner() {
+        printf 'Found 2 device(s):\n'
+        printf '  0:  Realtek, RTL2832U, SN: bbbb2222\n'
+        printf '  1:  Realtek, RTL2832U, SN: 00000001\n'
+    }
+    targeted_stamp_mocks
+    generate_random_serial() { printf 'a1b2c3d4'; }
+
+    run flash_targeted_serial "1-1.4"
+    [ "$status" -eq 0 ]
+    [ "$output" = "a1b2c3d4" ]
+    [ "$(cat "$RTL_EEPROM_LOG")" = "-d 1 -s a1b2c3d4" ]   # the sole default index
+}
+
+# Collision avoidance: a generated serial that already belongs to another
+# connected dongle is rejected; the next fresh candidate is written instead.
+@test "flash_targeted_serial never reuses a serial present on another dongle" {
+    rtlsdr_devices=( "$(printf 'aaaa1111\t1-1.2')" "$(printf 'bbbb2222\t1-1.4')" )
+    list_rtlsdr_banner() {
+        printf 'Found 2 device(s):\n'
+        printf '  0:  Realtek, RTL2832U, SN: aaaa1111\n'
+        printf '  1:  Realtek, RTL2832U, SN: bbbb2222\n'
+    }
+    targeted_stamp_mocks
+    # First candidate collides with the OTHER connected dongle (aaaa1111); the
+    # avoid-set must reject it and accept the second, fresh value.
+    SERIAL_SEQ="$BATS_TEST_TMPDIR/serials"
+    printf 'aaaa1111\nfeedbeef\n' > "$SERIAL_SEQ"
+    generate_random_serial() { sed -n '1p' "$SERIAL_SEQ"; sed -i '1d' "$SERIAL_SEQ"; }
+
+    run flash_targeted_serial "1-1.4"
+    [ "$status" -eq 0 ]
+    [ "$output" = "feedbeef" ]                            # the colliding candidate was skipped
+    [ "$(cat "$RTL_EEPROM_LOG")" = "-d 1 -s feedbeef" ]
+}
+
+# --- surface_radio_status ----------------------------------------------------
+
+# surface_radio_status is defined inside main(), so it cannot be sourced. Define
+# a byte-for-byte copy of its body here (kept in sync with run.sh) so the test
+# can exercise the surfacing contract: the per-radio log line and the
+# radios.status file fields. resolve_addon_host and bashio logging are stubbed so
+# nothing touches the network.
+surface_radio_status() {
+    local host i tag uid port serial status_file tmp
+    host="$(resolve_addon_host)"
+
+    for i in "${!radio_ports[@]}"
+    do
+        tag="${radio_tags[$i]}"
+        uid="${radio_unique_ids[$i]}"
+        port="${radio_ports[$i]}"
+        bashio::log.info "Radio ${tag}: unique_id=${uid} host=${host:-<unknown>} port=${port}"
+    done
+
+    status_file="${conf_directory}/radios.status"
+    tmp="${status_file}.tmp"
+    if {
+        printf '# rtl_433 radios — values for the Home Assistant reconfigure step\n'
+        for i in "${!radio_ports[@]}"
+        do
+            tag="${radio_tags[$i]}"
+            uid="${radio_unique_ids[$i]}"
+            port="${radio_ports[$i]}"
+            serial="${radio_serials[$i]:-}"
+            printf 'radio=%s\tunique_id=%s\thost=%s\tport=%s\tserial=%s\n' \
+                "$tag" "$uid" "${host:-}" "$port" "$serial"
+        done
+    } > "$tmp" 2>/dev/null && mv "$tmp" "$status_file" 2>/dev/null
+    then
+        :
+    else
+        rm -f "$tmp" 2>/dev/null
+        bashio::log.warning "Could not write ${status_file} (non-fatal)."
+    fi
+}
+
+@test "surface_radio_status emits unique_id/host/port and writes radios.status" {
+    conf_directory="$BATS_TEST_TMPDIR"
+    radio_ports=( 8433 8434 )
+    radio_tags=( radio0 radio1 )
+    radio_unique_ids=( "serial:00000abc" "usbpath:1-1.4" )
+    radio_serials=( "00000abc" "" )
+    resolve_addon_host() { printf 'a0d7b954-rtl-433'; }
+    # Capture the emitted log lines so the per-radio surfacing line can be asserted.
+    LOG="$BATS_TEST_TMPDIR/log"
+    : > "$LOG"
+    bashio::log.info()    { printf '%s\n' "$*" >> "$LOG"; }
+    bashio::log.warning() { printf '%s\n' "$*" >> "$LOG"; }
+
+    surface_radio_status
+
+    # (a) The emitted log line carries all three reconfigure fields.
+    grep -q 'unique_id=serial:00000abc' "$LOG"
+    grep -q 'host=a0d7b954-rtl-433' "$LOG"
+    grep -q 'port=8433' "$LOG"
+
+    # (b) radios.status exists and carries those fields for each radio.
+    status_file="$conf_directory/radios.status"
+    [ -f "$status_file" ]
+    grep -q $'unique_id=serial:00000abc\thost=a0d7b954-rtl-433\tport=8433' "$status_file"
+    grep -q $'unique_id=usbpath:1-1.4\thost=a0d7b954-rtl-433\tport=8434' "$status_file"
+}
