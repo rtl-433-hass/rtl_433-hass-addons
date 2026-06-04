@@ -3,7 +3,11 @@
 # SC1090: run.sh is sourced via a runtime-computed path (cannot be followed statically).
 # SC2034: the rtlsdr_devices arrays set per-test are read by functions sourced from run.sh.
 # SC2317: the bashio::* stubs are invoked indirectly by the sourced helpers.
-# shellcheck disable=SC1090,SC2034,SC2317
+# SC2030/SC2031: each @test runs in its own subshell, so the radio_* arrays a
+#   test seeds and a helper (e.g. build_discovery_body) reads are confined to
+#   that subshell by design; shellcheck's "modified/used in a subshell" note is
+#   expected here.
+# shellcheck disable=SC1090,SC2034,SC2317,SC2030,SC2031
 # Unit tests for the dongle-detection / identifier helpers in rtl_433/run.sh.
 #
 # run.sh has a main()-guard, so sourcing it under plain bash defines the helper
@@ -803,7 +807,7 @@ targeted_stamp_mocks() {
 # radios.status file fields. resolve_addon_host and bashio logging are stubbed so
 # nothing touches the network.
 surface_radio_status() {
-    local host i tag uid port serial status_file tmp
+    local host i tag uid port serial portpath status_file tmp
     host="$(resolve_addon_host)"
 
     for i in "${!radio_ports[@]}"
@@ -824,8 +828,9 @@ surface_radio_status() {
             uid="${radio_unique_ids[$i]}"
             port="${radio_ports[$i]}"
             serial="${radio_serials[$i]:-}"
-            printf 'radio=%s\tunique_id=%s\thost=%s\tport=%s\tserial=%s\n' \
-                "$tag" "$uid" "${host:-}" "$port" "$serial"
+            portpath="${radio_portpaths[$i]:-}"
+            printf 'radio=%s\tunique_id=%s\thost=%s\tport=%s\tserial=%s\tportpath=%s\n' \
+                "$tag" "$uid" "${host:-}" "$port" "$serial" "$portpath"
         done
     } > "$tmp" 2>/dev/null && mv "$tmp" "$status_file" 2>/dev/null
     then
@@ -836,12 +841,15 @@ surface_radio_status() {
     fi
 }
 
-@test "surface_radio_status emits unique_id/host/port and writes radios.status" {
+@test "surface_radio_status emits unique_id/host/port and writes radios.status with portpath" {
     conf_directory="$BATS_TEST_TMPDIR"
     radio_ports=( 8433 8434 )
     radio_tags=( radio0 radio1 )
     radio_unique_ids=( "serial:00000abc" "usbpath:1-1.4" )
     radio_serials=( "00000abc" "" )
+    # Index-aligned port paths: a real path for radio0, and an EMPTY path for
+    # radio1 (e.g. a template-identity radio with no resolvable USB port).
+    radio_portpaths=( "1-1.4" "" )
     resolve_addon_host() { printf 'a0d7b954-rtl-433'; }
     # Capture the emitted log lines so the per-radio surfacing line can be asserted.
     LOG="$BATS_TEST_TMPDIR/log"
@@ -856,9 +864,78 @@ surface_radio_status() {
     grep -q 'host=a0d7b954-rtl-433' "$LOG"
     grep -q 'port=8433' "$LOG"
 
-    # (b) radios.status exists and carries those fields for each radio.
+    # (b) radios.status exists and carries those fields, now including portpath,
+    # for each radio: a populated portpath for radio0 and an empty one for radio1.
     status_file="$conf_directory/radios.status"
     [ -f "$status_file" ]
-    grep -q $'unique_id=serial:00000abc\thost=a0d7b954-rtl-433\tport=8433' "$status_file"
-    grep -q $'unique_id=usbpath:1-1.4\thost=a0d7b954-rtl-433\tport=8434' "$status_file"
+    grep -q $'unique_id=serial:00000abc\thost=a0d7b954-rtl-433\tport=8433\tserial=00000abc\tportpath=1-1.4' "$status_file"
+    grep -q $'unique_id=usbpath:1-1.4\thost=a0d7b954-rtl-433\tport=8434\tserial=\tportpath=' "$status_file"
+}
+
+# --- discovery roster (publish_discovery 'radios' array) ---------------------
+
+# The 'radios' roster builder lives INSIDE publish_discovery, which also does the
+# network POSTs and needs SUPERVISOR_TOKEN, so it cannot be sourced and called in
+# isolation. Replicate the exact roster-build snippet and the body printf from
+# run.sh's publish_discovery here (kept in sync with run.sh) so the test exercises
+# the JSON-assembly contract: a valid, additive 'config.radios' array carrying both
+# identifiers per radio, with the legacy single-radio fields left intact.
+build_discovery_body() {
+    local host="$1"
+    # _json_safe: same allowlist run.sh uses to keep device-derived text from
+    # breaking the hand-built JSON.
+    _json_safe() { printf '%s' "$1" | tr -c 'A-Za-z0-9:._-' '_'; }
+
+    local radios_json="" sep="" j ruid rport rserial rpath rusb
+    for j in "${!radio_ports[@]}"
+    do
+        ruid="$(_json_safe "${radio_unique_ids[$j]}")"
+        rport="${radio_ports[$j]}"
+        rserial="$(_json_safe "${radio_serials[$j]:-}")"
+        rusb="$(_json_safe "${radio_portpaths[$j]:-}")"
+        rpath="/ws"
+        radios_json+="${sep}{\"unique_id\": \"${ruid}\", \"port\": ${rport}, \"path\": \"${rpath}\", \"serial\": \"${rserial}\", \"usbpath\": \"${rusb}\"}"
+        sep=", "
+    done
+
+    # Mirror run.sh: the legacy top-level fields come from the FIRST radio's
+    # host/port/unique_id, with the additive roster appended.
+    local body
+    printf -v body \
+        '{"service": "rtl_433", "config": {"host": "%s", "port": %s, "path": "/ws", "secure": false, "unique_id": "%s", "radios": [%s]}}' \
+        "$host" "${radio_ports[0]}" "${radio_unique_ids[0]}" "$radios_json"
+    printf '%s' "$body"
+}
+
+@test "discovery body builds a valid additive radios roster covering all identity kinds" {
+    # Mixed mock set: a usable serial, an empty-serial/usbpath-identity radio, and
+    # a template-identity radio with BOTH serial and usbpath empty.
+    radio_ports=( 8433 8434 8435 )
+    radio_tags=( radio0 radio1 radio2 )
+    radio_unique_ids=( "serial:00000abc" "usbpath:1-1.2" "template:soapy" )
+    radio_serials=( "00000abc" "" "" )
+    radio_portpaths=( "1-1.4" "1-1.2" "" )
+
+    body="$(build_discovery_body "a0d7b954-rtl-433")"
+
+    # (a) Valid JSON.
+    run bash -c 'printf "%s" "$0" | jq -e .' "$body"
+    [ "$status" -eq 0 ]
+
+    # (b) The roster holds one entry per radio.
+    printf '%s' "$body" | jq -e '.config.radios | length == 3'
+
+    # (c) Every entry carries all five keys (serial/usbpath may be "").
+    printf '%s' "$body" \
+        | jq -e 'all(.config.radios[]; has("unique_id") and has("port") and has("path") and has("serial") and has("usbpath"))'
+
+    # (d) Dual identity is preserved: the serial radio keeps its serial, the
+    # usbpath radio carries an empty serial but a port path, and the template
+    # radio has BOTH serial and usbpath empty.
+    printf '%s' "$body" | jq -e '.config.radios[0].serial == "00000abc" and .config.radios[0].usbpath == "1-1.4"'
+    printf '%s' "$body" | jq -e '.config.radios[1].serial == "" and .config.radios[1].usbpath == "1-1.2"'
+    printf '%s' "$body" | jq -e '.config.radios[2].serial == "" and .config.radios[2].usbpath == ""'
+
+    # (e) Back-compat: the legacy top-level single-radio fields are still present.
+    printf '%s' "$body" | jq -e '.config.host and .config.port and .config.path and .config.unique_id'
 }
