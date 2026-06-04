@@ -351,10 +351,10 @@ graph TD
 
 No circular dependencies.
 
-### Phase 1: Core option logic & config (parallel)
+### ✅ Phase 1: Core option logic & config (parallel)
 **Parallel Tasks:**
-- Task 001: Implement force_randomize_serial targeted EEPROM stamp in run.sh
-- Task 003: Add force_randomize_serial option to both config.json files
+- ✔️ Task 001: Implement force_randomize_serial targeted EEPROM stamp in run.sh — `completed`
+- ✔️ Task 003: Add force_randomize_serial option to both config.json files — `completed`
 
 (Different files — `run.sh` vs `config.json`/Python — so safe to run in parallel.)
 
