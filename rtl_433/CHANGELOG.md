@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.4
+
+_2026-06-04_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.7.3...v0.7.4)
+
+
+### Bug Fixes
+
+* **rtl_433:** avoid USB-claim races in the EEPROM serial flasher ([#102](https://github.com/rtl-433-hass/rtl_433-hass-addons/issues/102)) ([c4202ea](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/c4202ea14d3af1928647654b44036f95e1d97d16))
+
 ## 0.7.3
 
 _2026-06-04_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.7.2...v0.7.3)
