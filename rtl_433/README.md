@@ -213,6 +213,18 @@ re-links it in the integration:
    the new radio's `unique_id` and `host:port` from the previous step. Your
    decoded sensor entities, their history, and automations are preserved.
 
+**Guided alternative (Repairs).** The same re-link can be driven from a Home
+Assistant **Repairs** issue instead of doing step 4 by hand. The
+[rtl_433 integration](https://github.com/rtl-433-hass/rtl_433) detects a new
+radio by diffing the add-on's discovery roster across the restart that the
+procedure already requires (stop → replug → start): on the next start the add-on
+re-publishes the full current roster (see
+[Discovery payload contract](#discovery-payload-contract) below), and a
+`unique_id` that was not present before surfaces as a "a new radio was found —
+replace the radio on hub X?" repair you can resolve in **Settings -> Devices &
+Services -> Repairs**. The manual procedure above remains available; the Repairs
+flow is the guided equivalent of step 4.
+
 #### Identity trade-off (`serial:` vs `usbpath:`)
 
 The two stable identities the add-on can assign behave differently when hardware
@@ -229,6 +241,61 @@ Practical guidance: if you never rearrange USB ports, you may prefer relying on
 `usbpath:` identity — keep each dongle in a fixed port and a same-port swap needs
 no stamping and no reconfigure. If you do rearrange ports, assign unique serials
 and accept the reconfigure step when a serial-identified dongle is replaced.
+
+#### Discovery payload contract
+
+The add-on publishes a single Supervisor discovery message (the Supervisor
+collapses an add-on's same-service messages into one). Its `config` object keeps
+all the existing single-radio fields unchanged for back-compat and **adds** a
+`radios` array describing every launched radio. The field names below are a
+cross-repo contract with the [rtl_433 integration](https://github.com/rtl-433-hass/rtl_433)
+and must match its discovery consumer verbatim:
+
+```jsonc
+{
+  "service": "rtl_433",
+  "config": {
+    // legacy single-radio fields (unchanged; the last-published radio)
+    "host": "<addon-hostname>",
+    "port": 8434,
+    "path": "/ws",
+    "secure": false,
+    "unique_id": "serial:abcd1234",
+    // additive full current roster (one entry per launched radio)
+    "radios": [
+      { "unique_id": "serial:abcd1234", "port": 8433, "path": "/ws",
+        "serial": "abcd1234", "usbpath": "1-1.4" },
+      { "unique_id": "usbpath:1-1.2", "port": 8434, "path": "/ws",
+        "serial": "", "usbpath": "1-1.2" }
+    ]
+  }
+}
+```
+
+Each `radios[]` entry carries:
+
+ - **`unique_id`** — the stable per-radio key (`serial:…`, `usbpath:…`, or
+   `template:…`), the same value derived in [How it works](#how-it-works).
+ - **`port`** and **`path`** — the radio's assigned TCP port and WebSocket path.
+ - **`serial`** and **`usbpath`** — **both** stable identifiers, so a consumer can
+   correlate a same-port hardware swap; either may be an empty string (a
+   `template:`-identity radio has both empty).
+
+`host` is shared by every radio and stays at the top level only; the per-radio
+connection is therefore `ws://<host>:<entry.port><entry.path>`. The legacy
+single-radio fields (`host`, `port`, `path`, `secure`, `unique_id`) remain
+present and unchanged, so an integration that reads only those keeps working.
+
+> [!WARNING]
+> `port` is assigned `BASE_PORT + i` (starting at `8433`) in dongle enumeration
+> order, so it **shifts when the set of connected dongles changes** and is **not**
+> a stable key. Consumers must key on `unique_id`, never on `host:port`.
+
+The `radios` array reflects the **radios present at this start**, not a durable
+inventory. A dongle that is momentarily missing on one start (a USB glitch or a
+slow enumeration) is simply absent from that roster, so a consumer should not read
+a transient absence as a permanent removal — treat a *new, unbound* radio as the
+replacement signal rather than the mere absence of a known one.
 
 ### Non-RTL-SDR radios (SoapySDR / HackRF)
 
