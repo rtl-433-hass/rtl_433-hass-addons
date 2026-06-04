@@ -21,6 +21,7 @@
   ],
   "options": {
     "randomize_default_serial": false,
+    "force_randomize_serial": "",
     "disable_tpms": true,
     "log_received_messages": false,
     "log_diagnostic_messages": false,
@@ -31,6 +32,7 @@
   },
   "schema": {
     "randomize_default_serial": "bool",
+    "force_randomize_serial": "str?",
     "disable_tpms": "bool",
     "log_received_messages": "bool",
     "log_diagnostic_messages": "bool",
