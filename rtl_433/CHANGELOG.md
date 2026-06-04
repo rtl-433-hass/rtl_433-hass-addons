@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.0
+
+_2026-06-04_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.7.4...v0.8.0)
+
+
+### Features
+
+* **rtl_433:** add force_randomize_serial targeted EEPROM re-stamp ([db1f4c6](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/db1f4c6ea74cf81ab4ea742532c52b0e9883bbdf))
+* **rtl_433:** publish an additive radios roster in discovery ([fc2abd6](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/fc2abd6977d17d7ca880b2eef0a804bda57c10b7))
+* **rtl_433:** surface each radio's unique_id and host:port ([f0c5153](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/f0c5153f6054517084b740df51e8cca480551c0e))
+* **rtl_433:** surface each radio's USB port path alongside its serial ([00bfbf9](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/00bfbf9e2165c349b4555ecc837a799e0d43f519))
+
 ## 0.7.4
 
 _2026-06-04_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.7.3...v0.7.4)
