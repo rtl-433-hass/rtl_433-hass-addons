@@ -613,6 +613,27 @@ remove_discovery_state() {
     rm -f "$state"
 }
 
+# Resolve the host Home Assistant should connect to for this add-on. Prefers the
+# Supervisor-assigned hostname (bashio::addon.hostname, which wraps
+# '/addons/self/info') so the value stays correct across restarts and networks;
+# when that helper is missing or returns nothing it queries the Supervisor
+# endpoint directly. Prints the hostname (empty if it cannot be determined, e.g.
+# a local/test run with no SUPERVISOR_TOKEN). Shared by publish_discovery (which
+# advertises the host) and surface_radio_status (which surfaces it for the user).
+resolve_addon_host() {
+    local host=""
+    if bashio::var.has_value "$(bashio::addon.hostname 2>/dev/null)"
+    then
+        host="$(bashio::addon.hostname)"
+    elif [ -n "${SUPERVISOR_TOKEN:-}" ]
+    then
+        host="$(curl -s -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+            "http://supervisor/addons/self/info" 2>/dev/null \
+            | sed -n 's/.*"hostname"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+    fi
+    printf '%s' "$host"
+}
+
 # Extract the auto-measured PPM crystal offset from captured 'rtl_test -p' output.
 # rtl_test prints a refining 'cumulative PPM: <n>' line periodically; the LAST one
 # is its best estimate. Prints just that integer (which may be negative); prints
@@ -952,6 +973,7 @@ main() {
     radio_ports=()
     radio_tags=()
     radio_unique_ids=()
+    radio_serials=()
 
     # Space-padded set of override identifiers that matched a detected radio, so we
     # can warn about leftover '<id>.conf' files that match nothing.
@@ -976,8 +998,10 @@ main() {
     #   $5 uid           - discovery unique_id
     #   $6 source_label  - path shown in the 'appended from' comment (defaults to $4)
     #   $7 ppm           - measured PPM offset to inject as 'ppm_error' (empty for none)
+    #   $8 serial        - this radio's current USB serial (empty when none/unknown),
+    #                      recorded in radio_serials for surface_radio_status
     launch_radio() {
-        local port="$1" tag="$2" device_line="$3" override_file="$4" uid="$5" source_label="${6:-$4}" ppm="${7:-}"
+        local port="$1" tag="$2" device_line="$3" override_file="$4" uid="$5" source_label="${6:-$4}" ppm="${7:-}" serial="${8:-}"
         local live="${render_dir}/${tag}.conf"
 
         # Build the raw rendered config: optional injected device line + baked-in
@@ -1033,6 +1057,7 @@ main() {
         radio_ports+=("$port")
         radio_tags+=("$tag")
         radio_unique_ids+=("$uid")
+        radio_serials+=("$serial")
     }
 
     # Measure one radio's PPM crystal offset with rtl_test and cache it under
@@ -1296,7 +1321,7 @@ main() {
             scan_noise_for_radio "$noise_selector" "$match_id"
         fi
 
-        launch_radio "$port" "$match_id" "device ${selector}" "$expected_file" "$unique_id" "$expected_file" "$radio_ppm"
+        launch_radio "$port" "$match_id" "device ${selector}" "$expected_file" "$unique_id" "$expected_file" "$radio_ppm" "$serial"
     done
 
 # Launch explicitly-declared radios from config-dir files that did not match a
@@ -1367,18 +1392,10 @@ main() {
 
         # Determine the host Home Assistant should connect to. We use the add-on's
         # Supervisor-assigned hostname rather than a hard-coded IP so the value
-        # stays correct across restarts and networks. bashio::addon.hostname wraps
-        # the Supervisor '/addons/self/info' endpoint; if that helper is missing or
-        # returns nothing we fall back to querying the endpoint directly.
+        # stays correct across restarts and networks (see resolve_addon_host,
+        # shared with surface_radio_status).
         local host=""
-        if bashio::var.has_value "$(bashio::addon.hostname 2>/dev/null)"
-        then
-            host="$(bashio::addon.hostname)"
-        else
-            host="$(curl -s -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
-                "http://supervisor/addons/self/info" \
-                | sed -n 's/.*"hostname"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
-        fi
+        host="$(resolve_addon_host)"
 
         if [ -z "$host" ]
         then
@@ -1439,11 +1456,56 @@ main() {
         save_discovery_uuid "$published_uuid"
     }
 
+    # Surface each launched radio's reconfigure values for the user: emit one
+    # copy-pasteable log line per radio (unique_id + host:port — exactly what the
+    # companion integration's reconfigure step asks for) and write a
+    # human-readable 'radios.status' file into the add-on config directory. The
+    # host is resolved the same way publish_discovery advertises it; when it is
+    # unavailable the line/file still show unique_id and port. Writing the file is
+    # best-effort: a failure is logged and never affects radio startup (rendered
+    # to a temp file then atomically moved into place).
+    surface_radio_status() {
+        local host i tag uid port serial status_file tmp
+        host="$(resolve_addon_host)"
+
+        # Always emit the per-radio log lines, regardless of whether the status
+        # file can be written.
+        for i in "${!radio_ports[@]}"
+        do
+            tag="${radio_tags[$i]}"
+            uid="${radio_unique_ids[$i]}"
+            port="${radio_ports[$i]}"
+            bashio::log.info "Radio ${tag}: unique_id=${uid} host=${host:-<unknown>} port=${port}"
+        done
+
+        status_file="${conf_directory}/radios.status"
+        tmp="${status_file}.tmp"
+        if {
+            printf '# rtl_433 radios — values for the Home Assistant reconfigure step\n'
+            for i in "${!radio_ports[@]}"
+            do
+                tag="${radio_tags[$i]}"
+                uid="${radio_unique_ids[$i]}"
+                port="${radio_ports[$i]}"
+                serial="${radio_serials[$i]:-}"
+                printf 'radio=%s\tunique_id=%s\thost=%s\tport=%s\tserial=%s\n' \
+                    "$tag" "$uid" "${host:-}" "$port" "$serial"
+            done
+        } > "$tmp" 2>/dev/null && mv "$tmp" "$status_file" 2>/dev/null
+        then
+            :
+        else
+            rm -f "$tmp" 2>/dev/null
+            bashio::log.warning "Could not write ${status_file} (non-fatal)."
+        fi
+    }
+
     # Advertise the running radios, or clean up a leftover discovery message when
     # there are none.
     if [ "${#radio_ports[@]}" -gt 0 ]
     then
         publish_discovery
+        surface_radio_status
     else
         remove_discovery_state
     fi
