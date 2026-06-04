@@ -358,9 +358,9 @@ No circular dependencies.
 
 (Different files — `run.sh` vs `config.json`/Python — so safe to run in parallel.)
 
-### Phase 2: Surfacing (depends on Phase 1 run.sh changes)
+### ✅ Phase 2: Surfacing (depends on Phase 1 run.sh changes)
 **Parallel Tasks:**
-- Task 002: Surface each radio's unique_id + host:port via log line and radios.status (depends on: 001)
+- ✔️ Task 002: Surface each radio's unique_id + host:port via log line and radios.status (depends on: 001) — `completed`
 
 (Sequenced after Task 001 because both edit `run.sh`.)
 
