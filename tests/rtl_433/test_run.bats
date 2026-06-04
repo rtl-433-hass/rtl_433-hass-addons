@@ -874,33 +874,17 @@ surface_radio_status() {
 
 # --- discovery roster (publish_discovery 'radios' array) ---------------------
 
-# The 'radios' roster builder lives INSIDE publish_discovery, which also does the
-# network POSTs and needs SUPERVISOR_TOKEN, so it cannot be sourced and called in
-# isolation. Replicate the exact roster-build snippet and the body printf from
-# run.sh's publish_discovery here (kept in sync with run.sh) so the test exercises
-# the JSON-assembly contract: a valid, additive 'config.radios' array carrying both
-# identifiers per radio, with the legacy single-radio fields left intact.
+# The 'radios' roster builder is build_discovery_radios_json — a top-level helper
+# in run.sh that publish_discovery calls. publish_discovery itself also does the
+# network POSTs and needs SUPERVISOR_TOKEN, so it is not callable in isolation,
+# but the roster builder is (it is sourced from run.sh). This wrapper calls the
+# REAL helper and only adds the trivial outer-body printf publish_discovery uses,
+# so the contract-bearing assembly logic is exercised, not a copy of it.
 build_discovery_body() {
-    local host="$1"
-    # _json_safe: same allowlist run.sh uses to keep device-derived text from
-    # breaking the hand-built JSON.
-    _json_safe() { printf '%s' "$1" | tr -c 'A-Za-z0-9:._-' '_'; }
-
-    local radios_json="" sep="" j ruid rport rserial rpath rusb
-    for j in "${!radio_ports[@]}"
-    do
-        ruid="$(_json_safe "${radio_unique_ids[$j]}")"
-        rport="${radio_ports[$j]}"
-        rserial="$(_json_safe "${radio_serials[$j]:-}")"
-        rusb="$(_json_safe "${radio_portpaths[$j]:-}")"
-        rpath="/ws"
-        radios_json+="${sep}{\"unique_id\": \"${ruid}\", \"port\": ${rport}, \"path\": \"${rpath}\", \"serial\": \"${rserial}\", \"usbpath\": \"${rusb}\"}"
-        sep=", "
-    done
-
+    local host="$1" radios_json body
+    radios_json="$(build_discovery_radios_json)"
     # Mirror run.sh: the legacy top-level fields come from the FIRST radio's
     # host/port/unique_id, with the additive roster appended.
-    local body
     printf -v body \
         '{"service": "rtl_433", "config": {"host": "%s", "port": %s, "path": "/ws", "secure": false, "unique_id": "%s", "radios": [%s]}}' \
         "$host" "${radio_ports[0]}" "${radio_unique_ids[0]}" "$radios_json"

@@ -520,6 +520,36 @@ radio_match_id() {
     printf '%s' "$raw" | tr -c 'A-Za-z0-9:._-' '_'
 }
 
+# Sanitise device-derived text to the same JSON-safe allowlist
+# resolve_radio_unique_id uses, so no quote/backslash in a serial or USB port
+# path can break the hand-built discovery JSON. Args: <value>.
+_json_safe() {
+    printf '%s' "$1" | tr -c 'A-Za-z0-9:._-' '_'
+}
+
+# Build the additive 'radios' discovery roster: one JSON object per launched
+# radio, comma-separated with NO enclosing brackets (the caller wraps it in
+# '[]'). Read from the index-aligned radio_ports/radio_unique_ids/radio_serials/
+# radio_portpaths globals. Each entry exposes the stable unique_id, the assigned
+# port/path, and BOTH identifiers (serial and usbpath, either possibly empty) so
+# a consumer can correlate a same-USB-port replacement. Every device-derived
+# field passes through _json_safe so the hand-built JSON cannot be broken. Kept
+# as a top-level helper (not nested in publish_discovery) so it is unit-testable
+# by sourcing run.sh. Prints the entries to stdout.
+build_discovery_radios_json() {
+    local out="" sep="" j ruid rport rserial rusb
+    for j in "${!radio_ports[@]}"
+    do
+        ruid="$(_json_safe "${radio_unique_ids[$j]}")"
+        rport="${radio_ports[$j]}"
+        rserial="$(_json_safe "${radio_serials[$j]:-}")"
+        rusb="$(_json_safe "${radio_portpaths[$j]:-}")"
+        out+="${sep}{\"unique_id\": \"${ruid}\", \"port\": ${rport}, \"path\": \"/ws\", \"serial\": \"${rserial}\", \"usbpath\": \"${rusb}\"}"
+        sep=", "
+    done
+    printf '%s' "$out"
+}
+
 # Supervise a single radio: run its rtl_433 in a restart loop so a single
 # device failure (USB busy, dongle unplugged, decoder crash) only restarts that
 # radio rather than taking down the whole add-on. Uses exponential backoff
@@ -1412,29 +1442,15 @@ main() {
             return 0
         fi
 
-        # Sanitise device-derived text to the same JSON-safe allowlist
-        # resolve_radio_unique_id uses, so no quote/backslash in a serial or USB
-        # path can break the hand-built JSON below.
-        _json_safe() { printf '%s' "$1" | tr -c 'A-Za-z0-9:._-' '_'; }
-
-        # Build the additive 'radios' roster once: an entry per launched radio,
-        # iterating the index-aligned parallel arrays. This array is purely
-        # additive (the legacy single-radio fields are unchanged); the companion
-        # integration consumes it for the radio-replacement flow. Because the
-        # Supervisor collapses an add-on's same-service discovery messages into
-        # one, every per-radio POST below carries an identical copy and the last
-        # surviving message keeps the full roster.
-        local radios_json="" sep="" j ruid rport rserial rpath rusb
-        for j in "${!radio_ports[@]}"
-        do
-            ruid="$(_json_safe "${radio_unique_ids[$j]}")"
-            rport="${radio_ports[$j]}"
-            rserial="$(_json_safe "${radio_serials[$j]:-}")"
-            rusb="$(_json_safe "${radio_portpaths[$j]:-}")"
-            rpath="/ws"
-            radios_json+="${sep}{\"unique_id\": \"${ruid}\", \"port\": ${rport}, \"path\": \"${rpath}\", \"serial\": \"${rserial}\", \"usbpath\": \"${rusb}\"}"
-            sep=", "
-        done
+        # Build the additive 'radios' roster once (an entry per launched radio).
+        # It is purely additive — the legacy single-radio fields stay unchanged;
+        # the companion integration consumes it for the radio-replacement flow.
+        # Because the Supervisor collapses an add-on's same-service discovery
+        # messages into one, every per-radio POST below carries an identical copy
+        # and the last surviving message keeps the full roster. The builder is a
+        # top-level helper (build_discovery_radios_json) so it can be unit-tested.
+        local radios_json
+        radios_json="$(build_discovery_radios_json)"
 
         local i port tag uid body response http_code resp_body msg_uuid published_uuid=""
         for i in "${!radio_ports[@]}"
