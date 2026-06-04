@@ -974,6 +974,9 @@ main() {
     radio_tags=()
     radio_unique_ids=()
     radio_serials=()
+    # Index-aligned USB port path for each radio ("" when none — e.g. an
+    # explicitly-declared SoapySDR/HackRF radio with no sysfs port path).
+    radio_portpaths=()
 
     # Space-padded set of override identifiers that matched a detected radio, so we
     # can warn about leftover '<id>.conf' files that match nothing.
@@ -1000,8 +1003,11 @@ main() {
     #   $7 ppm           - measured PPM offset to inject as 'ppm_error' (empty for none)
     #   $8 serial        - this radio's current USB serial (empty when none/unknown),
     #                      recorded in radio_serials for surface_radio_status
+    #   $9 portpath      - this radio's USB sysfs port path (empty when none, e.g.
+    #                      an explicitly-declared SoapySDR/HackRF radio), recorded
+    #                      in radio_portpaths
     launch_radio() {
-        local port="$1" tag="$2" device_line="$3" override_file="$4" uid="$5" source_label="${6:-$4}" ppm="${7:-}" serial="${8:-}"
+        local port="$1" tag="$2" device_line="$3" override_file="$4" uid="$5" source_label="${6:-$4}" ppm="${7:-}" serial="${8:-}" portpath="${9:-}"
         local live="${render_dir}/${tag}.conf"
 
         # Build the raw rendered config: optional injected device line + baked-in
@@ -1058,6 +1064,7 @@ main() {
         radio_tags+=("$tag")
         radio_unique_ids+=("$uid")
         radio_serials+=("$serial")
+        radio_portpaths+=("$portpath")
     }
 
     # Measure one radio's PPM crystal offset with rtl_test and cache it under
@@ -1321,7 +1328,7 @@ main() {
             scan_noise_for_radio "$noise_selector" "$match_id"
         fi
 
-        launch_radio "$port" "$match_id" "device ${selector}" "$expected_file" "$unique_id" "$expected_file" "$radio_ppm" "$serial"
+        launch_radio "$port" "$match_id" "device ${selector}" "$expected_file" "$unique_id" "$expected_file" "$radio_ppm" "$serial" "$portpath"
     done
 
 # Launch explicitly-declared radios from config-dir files that did not match a
@@ -1370,7 +1377,9 @@ main() {
 
         bashio::log.info "Explicitly-declared radio ${tag} (device '${device_value}') -> HTTP port ${port}."
 
-        launch_radio "$port" "$tag" "device ${device_value}" "$stripped" "$unique_id" "$f"
+        # ppm, serial, and portpath are all empty for explicitly-declared radios:
+        # they are not auto-detected dongles and have no sysfs port path.
+        launch_radio "$port" "$tag" "device ${device_value}" "$stripped" "$unique_id" "$f" "" "" ""
     done
 
     # ---------------------------------------------------------------------------
@@ -1465,7 +1474,7 @@ main() {
     # best-effort: a failure is logged and never affects radio startup (rendered
     # to a temp file then atomically moved into place).
     surface_radio_status() {
-        local host i tag uid port serial status_file tmp
+        local host i tag uid port serial portpath status_file tmp
         host="$(resolve_addon_host)"
 
         # Always emit the per-radio log lines, regardless of whether the status
@@ -1488,8 +1497,9 @@ main() {
                 uid="${radio_unique_ids[$i]}"
                 port="${radio_ports[$i]}"
                 serial="${radio_serials[$i]:-}"
-                printf 'radio=%s\tunique_id=%s\thost=%s\tport=%s\tserial=%s\n' \
-                    "$tag" "$uid" "${host:-}" "$port" "$serial"
+                portpath="${radio_portpaths[$i]:-}"
+                printf 'radio=%s\tunique_id=%s\thost=%s\tport=%s\tserial=%s\tportpath=%s\n' \
+                    "$tag" "$uid" "${host:-}" "$port" "$serial" "$portpath"
             done
         } > "$tmp" 2>/dev/null && mv "$tmp" "$status_file" 2>/dev/null
         then
