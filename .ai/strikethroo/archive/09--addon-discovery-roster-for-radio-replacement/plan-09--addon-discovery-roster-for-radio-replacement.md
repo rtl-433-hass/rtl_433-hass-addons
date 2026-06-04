@@ -380,21 +380,85 @@ graph TD
 
 No circular dependencies.
 
-### Phase 1: Identity foundation
+### ✅ Phase 1: Identity foundation
 **Parallel Tasks:**
-- Task 001: Surface both serial and usbpath per radio in run.sh + portpath in radios.status
+- ✔️ Task 001: Surface both serial and usbpath per radio in run.sh + portpath in radios.status — `completed`
 
-### Phase 2: Discovery roster
+### ✅ Phase 2: Discovery roster
 **Parallel Tasks:**
-- Task 002: Add additive `radios` roster to the Supervisor discovery payload (depends on: 001)
+- ✔️ Task 002: Add additive `radios` roster to the Supervisor discovery payload (depends on: 001) — `completed`
 
-### Phase 3: Verification & documentation
+### ✅ Phase 3: Verification & documentation
 **Parallel Tasks:**
-- Task 003: BATS coverage for the roster and dual-identity surfacing (depends on: 001, 002)
-- Task 004: Document the discovery contract, port instability, Repairs pointer (depends on: 002)
+- ✔️ Task 003: BATS coverage for the roster and dual-identity surfacing (depends on: 001, 002) — `completed`
+- ✔️ Task 004: Document the discovery contract, port instability, Repairs pointer (depends on: 002) — `completed`
 
 ### Post-phase Actions
 
 ### Execution Summary
 - Total Phases: 3
 - Total Tasks: 4
+
+---
+
+## Execution Summary
+
+**Status**: ✅ Completed Successfully
+**Completed Date**: 2026-06-04
+
+### Results
+Delivered the add-on-side enablers for a Repairs-driven radio-replacement flow,
+all in the `feature/09--addon-discovery-roster-for-radio-replacement` branch:
+
+- **`rtl_433/run.sh`** — added an index-aligned `radio_portpaths` parallel array,
+  threaded the USB port path through `launch_radio`, and recorded `portpath=` in
+  `radios.status` (Task 001). Added an additive `radios` roster to the Supervisor
+  discovery payload — one entry per launched radio with `unique_id`, `port`,
+  `path`, and **both** `serial` and `usbpath` — leaving the legacy single-radio
+  fields byte-for-byte unchanged for back-compat (Task 002). The roster assembly
+  was extracted into a top-level, unit-testable `build_discovery_radios_json`
+  helper (POST_EXECUTION cleanup).
+- **`tests/rtl_433/test_run.bats`** — BATS coverage asserting the payload is valid
+  JSON with a `radios` array covering all three identity kinds (serial, usbpath,
+  and a `template:`-identity radio with both empty) and retaining the legacy
+  fields, plus `portpath=` surfacing in `radios.status` (Task 003). The test calls
+  the real builder helper.
+- **`rtl_433/README.md`** — a "Discovery payload contract" subsection (cross-repo
+  field shape), a warning that `port` (`BASE_PORT + i`) is not a stable key, and a
+  guided Home Assistant Repairs alternative plus transient-absence caveat in
+  "Replacing a radio" (Task 004).
+
+Verification: `bats -r tests/` → 60 tests, 0 failures; `shellcheck` clean on
+`run.sh` and the bats file; `python3 tests/config/validate_configs.py` → both
+add-ons pass.
+
+### Noteworthy Events
+- **Keystone premise confirmed during refinement.** The design hinged on whether
+  the Supervisor collapses an add-on's same-service discovery messages into one.
+  Rather than leave this as a hardware-gated spike, it was resolved by inspecting
+  the Supervisor source (`supervisor/discovery/__init__.py`: `Message` marks
+  `config`/`uuid` `eq=False`, so equality is (app, service) only and `send()`
+  overwrites the config). The premise holds, so the spike stage was dropped and
+  the implementation needed no special hardware.
+- **Parallel Phase 3 race observed and handled.** Tasks 003 and 004 ran
+  concurrently; the docs agent observed an intermediate state of
+  `tests/rtl_433/test_run.bats` and reported stale shellcheck findings, and the
+  pre-commit end-of-file-fixer touched three unrelated files. The final state was
+  verified independently (shellcheck clean, 60/0) and the unrelated files were
+  reverted before committing.
+- **POST_EXECUTION cleanup applied.** Task 003 initially replicated the roster
+  builder snippet in the test (a drift risk, because the builder was embedded in
+  the network-bound `publish_discovery`). Per the cleanup mandate, the builder was
+  extracted into a top-level `build_discovery_radios_json` helper that both
+  `publish_discovery` and the test call — removing the duplication with no
+  behavior change.
+
+### Necessary follow-ups
+- **Companion integration (`../rtl_433`)**: update `async_step_hassio` to consume
+  the new `config.radios` roster (discover every radio, not just the last) and
+  implement the Repairs detection/rebind — tracked by
+  `../rtl_433/RADIO_REPLACEMENT_PLAN.md`. This add-on change is additive and
+  back-compatible, so it can ship independently of the integration.
+- **Optional, non-gating**: confirm on a real Supervisor with ≥2 dongles that the
+  single discovery message's config carries the full `radios` roster and that an
+  un-updated integration still discovers one radio via the legacy fields.
