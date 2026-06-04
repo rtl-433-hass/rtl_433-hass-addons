@@ -364,10 +364,10 @@ No circular dependencies.
 
 (Sequenced after Task 001 because both edit `run.sh`.)
 
-### Phase 3: Tests & documentation (parallel)
+### ✅ Phase 3: Tests & documentation (parallel)
 **Parallel Tasks:**
-- Task 004: BATS coverage for targeting, collision guard, and surfacing (depends on: 001, 002)
-- Task 005: Document "Replacing a radio" in the rtl_433 README (depends on: 001, 002)
+- ✔️ Task 004: BATS coverage for targeting, collision guard, and surfacing (depends on: 001, 002) — `completed`
+- ✔️ Task 005: Document "Replacing a radio" in the rtl_433 README (depends on: 001, 002) — `completed`
 
 (Different files — `test_run.bats` vs `README.md` — so safe to run in parallel.)
 
@@ -379,3 +379,58 @@ Per phase: run `bats -r tests/`, `python3 tests/config/validate_configs.py`, and
 ### Execution Summary
 - Total Phases: 3
 - Total Tasks: 5
+
+## Execution Summary
+
+**Status**: ✅ Completed Successfully
+**Completed Date**: 2026-06-03
+
+### Results
+All five tasks completed across three phases on branch
+`feature/08--radio-replacement-support`:
+
+- **A — Targeted re-stamp (`feat`):** added `force_randomize_serial` (selector =
+  USB port path). Extracted the shared `_stamp_radio_serial` helper from
+  `flash_default_serials` (default-only semantics unchanged) and added
+  `flash_targeted_serial`, which maps the port path to a librtlsdr index via
+  `enumerate_rtlsdr_by_index` (PR #98 invariant), refuses on zero/multiple
+  matches or ambiguous/multi-default index mappings, stamps non-default targets,
+  and reuses the flash-and-halt block now printing the new `serial:<new>` per
+  stamped radio. Option added to both `rtl_433/config.json` and
+  `rtl_433-next/config.json` (`options` `""`, `schema` `"str?"`).
+- **B — Surfacing (`feat`):** per-radio `unique_id=… host=… port=…` startup log
+  line plus an atomic best-effort `radios.status` file in the add-on config
+  directory; factored `resolve_addon_host` out of `publish_discovery` and added a
+  `radio_serials` parallel array.
+- **Tests (`test`):** 8 new BATS cases (59 total, all green) covering
+  librtlsdr-index targeting under disagreeing sysfs order, non-default rewrite,
+  the zero/multiple/ambiguous refusal guards, collision avoidance, and the
+  surfacing output.
+- **Docs (`docs`):** "Replacing a radio" section in `rtl_433/README.md`
+  (procedure + `serial:`/`usbpath:` trade-off + where to read the identity).
+
+Validation: `bats -r tests/` 59/59 pass, `python3 tests/config/validate_configs.py`
+exit 0, `pre-commit` (shellcheck/json/etc.) all pass.
+
+### Noteworthy Events
+- A new BATS assertion initially used a bare `! grep …` which the pre-commit
+  shellcheck rejected (SC2314); the `run !` form suggested by shellcheck is
+  unsupported on the installed bats (< 1.5.0), so it was rewritten as
+  `run grep …; [ "$status" -ne 0 ]` — passes both shellcheck and bats.
+- Phase 3's two files were briefly committed together; the commit was split into
+  separate `test` and `docs` commits to match the repo's Conventional Commit
+  conventions.
+- `surface_radio_status` is intentionally nested in `main()` (it reads
+  `main()`-local `radio_*` arrays), matching existing nested helpers; its BATS
+  test holds a synced copy of the body. Not tech debt, but flagged below.
+
+### Necessary follow-ups
+- None blocking. Optional: if a future change extracts `surface_radio_status`
+  to a top-level sourceable helper, switch its BATS test to source it directly
+  and drop the inline body copy.
+- The companion integration's **Replace radio / reconfigure** workflow (paired
+  plan in the `rtl-433-hass/rtl_433` repo) is the other half of this feature and
+  is out of scope here.
+- Open a PR from `feature/08--radio-replacement-support`; release-please will
+  derive the `rtl_433/CHANGELOG.md` entry from the Conventional Commits (do not
+  hand-edit it).
