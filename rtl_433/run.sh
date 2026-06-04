@@ -1412,6 +1412,30 @@ main() {
             return 0
         fi
 
+        # Sanitise device-derived text to the same JSON-safe allowlist
+        # resolve_radio_unique_id uses, so no quote/backslash in a serial or USB
+        # path can break the hand-built JSON below.
+        _json_safe() { printf '%s' "$1" | tr -c 'A-Za-z0-9:._-' '_'; }
+
+        # Build the additive 'radios' roster once: an entry per launched radio,
+        # iterating the index-aligned parallel arrays. This array is purely
+        # additive (the legacy single-radio fields are unchanged); the companion
+        # integration consumes it for the radio-replacement flow. Because the
+        # Supervisor collapses an add-on's same-service discovery messages into
+        # one, every per-radio POST below carries an identical copy and the last
+        # surviving message keeps the full roster.
+        local radios_json="" sep="" j ruid rport rserial rpath rusb
+        for j in "${!radio_ports[@]}"
+        do
+            ruid="$(_json_safe "${radio_unique_ids[$j]}")"
+            rport="${radio_ports[$j]}"
+            rserial="$(_json_safe "${radio_serials[$j]:-}")"
+            rusb="$(_json_safe "${radio_portpaths[$j]:-}")"
+            rpath="/ws"
+            radios_json+="${sep}{\"unique_id\": \"${ruid}\", \"port\": ${rport}, \"path\": \"${rpath}\", \"serial\": \"${rserial}\", \"usbpath\": \"${rusb}\"}"
+            sep=", "
+        done
+
         local i port tag uid body response http_code resp_body msg_uuid published_uuid=""
         for i in "${!radio_ports[@]}"
         do
@@ -1425,10 +1449,12 @@ main() {
             # integration connects to ws://<host>:<port>/ws and uses 'unique_id' as
             # a stable per-radio key. host/port are interpolated; the unique_id is
             # pre-sanitised to a JSON-safe character set by resolve_radio_unique_id,
-            # so no further JSON escaping is needed.
+            # so no further JSON escaping is needed. The 'radios' array is appended
+            # as an additive roster (every member kept JSON-safe above), leaving the
+            # legacy fields byte-for-byte unchanged for back-compat.
             printf -v body \
-                '{"service": "rtl_433", "config": {"host": "%s", "port": %s, "path": "/ws", "secure": false, "unique_id": "%s"}}' \
-                "$host" "$port" "$uid"
+                '{"service": "rtl_433", "config": {"host": "%s", "port": %s, "path": "/ws", "secure": false, "unique_id": "%s", "radios": [%s]}}' \
+                "$host" "$port" "$uid" "$radios_json"
 
             # Best-effort POST. Capture the response body and the HTTP status (the
             # latter appended on its own trailing line) so a non-2xx response or a
