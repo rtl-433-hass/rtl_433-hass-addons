@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.3
+
+_2026-06-04_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.7.2...v0.7.3)
+
+
+### Bug Fixes
+
+* **rtl_433:** read EEPROM serials when the device banner omits SN ([cafbad2](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/cafbad2095d6b91c411bebc15a15096e8310171e))
+
 ## 0.7.2
 
 _2026-06-03_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.7.1...v0.7.2)
