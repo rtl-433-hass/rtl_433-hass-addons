@@ -240,6 +240,64 @@ EOF
     [ ! -s "$RTL_EEPROM_LOG" ]                            # rtl_eeprom never called
 }
 
+# Regression: a transient USB-claim collision makes the first 'rtl_eeprom' open
+# fail. The flasher must retry (after a settle pause) rather than dropping the
+# dongle at its factory-default serial.
+@test "flash_default_serials retries a transient EEPROM write failure" {
+    rtlsdr_devices=("$(printf '00000001\t1-1.4')")
+    list_rtlsdr_banner() {
+        printf 'Found 1 device(s):\n  0:  Realtek, RTL2832U, SN: 00000001\n'
+    }
+    timeout() { shift; "$@"; }
+    generate_random_serial() { printf 'a1b2c3d4'; }
+    bashio::log.info()    { :; }
+    bashio::log.warning() { :; }
+    SLEEP_LOG="$BATS_TEST_TMPDIR/sleep.calls"
+    : > "$SLEEP_LOG"
+    sleep() { printf '%s\n' "$1" >> "$SLEEP_LOG"; }
+    ATTEMPT_FILE="$BATS_TEST_TMPDIR/attempts"
+    printf '0' > "$ATTEMPT_FILE"
+    # Fail the first open, succeed on the second. The counter lives in a file so
+    # it survives the pipeline subshell ('printf | timeout rtl_eeprom').
+    rtl_eeprom() {
+        local n
+        n=$(( $(cat "$ATTEMPT_FILE") + 1 ))
+        printf '%s' "$n" > "$ATTEMPT_FILE"
+        [ "$n" -ge 2 ]
+    }
+
+    run flash_default_serials
+    [ "$status" -eq 0 ]
+    [ "$output" = "1" ]                       # dongle flashed after the retry
+    [ "$(cat "$ATTEMPT_FILE")" = "2" ]        # took exactly two attempts
+    [ "$(cat "$SLEEP_LOG")" = "2" ]           # paused once (EEPROM_WRITE_RETRY_DELAY)
+}
+
+# Regression: when every attempt fails the flasher gives up after exactly
+# EEPROM_WRITE_ATTEMPTS tries and reports the dongle as not flashed.
+@test "flash_default_serials gives up after EEPROM_WRITE_ATTEMPTS failures" {
+    rtlsdr_devices=("$(printf '00000001\t1-1.4')")
+    list_rtlsdr_banner() {
+        printf 'Found 1 device(s):\n  0:  Realtek, RTL2832U, SN: 00000001\n'
+    }
+    timeout() { shift; "$@"; }
+    generate_random_serial() { printf 'a1b2c3d4'; }
+    bashio::log.info()    { :; }
+    bashio::log.warning() { :; }
+    SLEEP_LOG="$BATS_TEST_TMPDIR/sleep.calls"
+    : > "$SLEEP_LOG"
+    sleep() { printf '%s\n' "$1" >> "$SLEEP_LOG"; }
+    CALL_LOG="$BATS_TEST_TMPDIR/calls"
+    : > "$CALL_LOG"
+    rtl_eeprom() { printf 'x' >> "$CALL_LOG"; return 1; }   # always fails
+
+    run flash_default_serials
+    [ "$status" -eq 0 ]
+    [ "$output" = "0" ]                       # nothing flashed
+    [ "$(cat "$CALL_LOG")" = "xxx" ]          # tried EEPROM_WRITE_ATTEMPTS (3) times
+    [ "$(grep -c . "$SLEEP_LOG")" -eq 2 ]     # paused between attempts (3 - 1)
+}
+
 # --- _serial_is_usable -------------------------------------------------------
 
 @test "_serial_is_usable rejects placeholders, short ints, empty, and duplicates" {
