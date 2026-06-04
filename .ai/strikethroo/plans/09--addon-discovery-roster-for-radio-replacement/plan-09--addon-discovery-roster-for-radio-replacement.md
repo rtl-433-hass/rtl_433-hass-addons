@@ -362,3 +362,39 @@ Contract notes:
   `template:`-identity (both-empty) edge case to Stage 1. Replaced the obsolete
   spike risk with a transient-absence false-positive caveat. Downgraded the
   hardware check to an optional, non-gating Self Validation step.
+
+## Execution Blueprint
+
+**Validation Gates:**
+- Reference: `/config/hooks/POST_PHASE.md`
+
+### Dependency Diagram
+
+```mermaid
+graph TD
+    001[Task 001: Dual-identity surfacing + radios.status portpath] --> 002[Task 002: Additive discovery roster]
+    001 --> 003[Task 003: BATS coverage]
+    002 --> 003
+    002 --> 004[Task 004: Docs - discovery contract & Repairs pointer]
+```
+
+No circular dependencies.
+
+### Phase 1: Identity foundation
+**Parallel Tasks:**
+- Task 001: Surface both serial and usbpath per radio in run.sh + portpath in radios.status
+
+### Phase 2: Discovery roster
+**Parallel Tasks:**
+- Task 002: Add additive `radios` roster to the Supervisor discovery payload (depends on: 001)
+
+### Phase 3: Verification & documentation
+**Parallel Tasks:**
+- Task 003: BATS coverage for the roster and dual-identity surfacing (depends on: 001, 002)
+- Task 004: Document the discovery contract, port instability, Repairs pointer (depends on: 002)
+
+### Post-phase Actions
+
+### Execution Summary
+- Total Phases: 3
+- Total Tasks: 4
