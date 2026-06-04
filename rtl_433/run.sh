@@ -37,6 +37,14 @@ RADIO_RESTART_MIN_DELAY=2
 RADIO_RESTART_MAX_DELAY=60
 RADIO_HEALTHY_UPTIME=60
 
+# The 'randomize_default_serial' maintenance pass writes each dongle's EEPROM via
+# 'rtl_eeprom -d <index>'. Opening a dongle can transiently fail to claim the USB
+# interface when several identical dongles are addressed in quick succession, so
+# a failed write is retried up to EEPROM_WRITE_ATTEMPTS times, pausing
+# EEPROM_WRITE_RETRY_DELAY seconds between tries to let the bus settle.
+EEPROM_WRITE_ATTEMPTS=3
+EEPROM_WRITE_RETRY_DELAY=2
+
 # Base sysfs path for USB device enumeration. Overridable so the enumeration can
 # be exercised against a mock tree in tests.
 SYSFS_USB_BASE="${SYSFS_USB_BASE:-/sys/bus/usb/devices}"
@@ -148,7 +156,13 @@ read_rtlsdr_serial_by_index() {
 # it writes is the same dongle whose serial it inspected. A blank serial (no USB
 # serial descriptor) is preserved as an empty field.
 enumerate_rtlsdr_by_index() {
-    local line idx
+    local banner line idx
+    # Capture the banner in full BEFORE iterating: list_rtlsdr_banner opens
+    # device 0 to read it, so streaming it via process substitution would let
+    # that 'rtl_eeprom' still hold the device while read_rtlsdr_serial_by_index
+    # tries to open the same one — a USB-claim collision that yields an empty
+    # serial. Letting the lister exit first keeps at most one open at a time.
+    banner="$(list_rtlsdr_banner)"
     while IFS= read -r line
     do
         # Banner rows look like "  0:  Realtek, RTL2838UHIDIR, SN: 00000001".
@@ -162,7 +176,7 @@ enumerate_rtlsdr_by_index() {
             idx="${BASH_REMATCH[1]}"
             printf '%s\t%s\n' "$idx" "$(read_rtlsdr_serial_by_index "$idx")"
         fi
-    done < <(list_rtlsdr_banner)
+    done <<< "$banner"
 }
 
 # Best-effort: print the sysfs port path of the connected dongle carrying the
@@ -242,7 +256,7 @@ generate_random_serial() {
 # flashed to stdout; all human-facing messages go through bashio (stderr).
 flash_default_serials() {
     local existing_serials=" " entry idx serial portpath new_serial cand
-    local flashed_count=0
+    local flashed_count=0 enumeration attempt wrote
 
     # Serials already present on a connected dongle, plus any picked earlier in
     # this same pass, so a freshly generated serial can never collide.
@@ -250,6 +264,13 @@ flash_default_serials() {
     do
         existing_serials+="${entry%%$'\t'*} "
     done
+
+    # Enumerate FULLY before writing anything: enumerate_rtlsdr_by_index opens
+    # each dongle to read its serial, so streaming it into this loop would let a
+    # read 'rtl_eeprom' overlap a write 'rtl_eeprom' on the same USB bus and
+    # transiently fail to claim a device. Capturing the result first guarantees
+    # all reads finish before the first write begins — at most one open at a time.
+    enumeration="$(enumerate_rtlsdr_by_index)"
 
     while IFS=$'\t' read -r idx serial
     do
@@ -280,15 +301,31 @@ flash_default_serials() {
 
         bashio::log.info "Radio at index ${idx}${portpath:+ (${portpath})}: writing random serial ${new_serial} to EEPROM (was default '${serial}')."
         # rtl_eeprom prompts for confirmation; auto-answer 'y' and bound the call
-        # so a stuck write cannot hang startup. A non-zero exit is tolerated.
-        if printf 'y\n' | timeout 30 rtl_eeprom -d "$idx" -s "$new_serial" >/dev/null 2>&1
+        # so a stuck write cannot hang startup. A failed open is usually a
+        # transient USB-claim collision, so retry a few times with a settle pause
+        # before giving up on this dongle.
+        wrote=0
+        for attempt in $(seq 1 "$EEPROM_WRITE_ATTEMPTS")
+        do
+            if printf 'y\n' | timeout 30 rtl_eeprom -d "$idx" -s "$new_serial" >/dev/null 2>&1
+            then
+                wrote=1
+                break
+            fi
+            if [ "$attempt" -lt "$EEPROM_WRITE_ATTEMPTS" ]
+            then
+                bashio::log.warning "Radio at index ${idx}: EEPROM write attempt ${attempt} failed; retrying in ${EEPROM_WRITE_RETRY_DELAY}s."
+                sleep "$EEPROM_WRITE_RETRY_DELAY"
+            fi
+        done
+        if [ "$wrote" -eq 1 ]
         then
             existing_serials+="${new_serial} "
             flashed_count=$((flashed_count + 1))
         else
-            bashio::log.warning "Radio at index ${idx}: rtl_eeprom failed to write serial ${new_serial} (non-fatal)."
+            bashio::log.warning "Radio at index ${idx}: rtl_eeprom failed to write serial ${new_serial} after ${EEPROM_WRITE_ATTEMPTS} attempts (non-fatal)."
         fi
-    done < <(enumerate_rtlsdr_by_index)
+    done <<< "$enumeration"
 
     printf '%s' "$flashed_count"
 }
