@@ -2,7 +2,7 @@
 id: 3
 group: "radio-replacement"
 dependencies: []
-status: "pending"
+status: "completed"
 created: 2026-06-03
 skills:
   - json
