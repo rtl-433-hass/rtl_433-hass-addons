@@ -155,6 +155,81 @@ best-effort: a missing `rtl_eeprom` or a failed/rejected write is logged and
 skipped. Leaving the option on simply keeps the add-on in this maintenance mode
 (no radios start), so remember to turn it back off when you're done.
 
+### Replacing a radio
+
+When an RTL-SDR dongle dies, you replace it with a new one and want your existing
+Home Assistant configuration — the decoded sensor entities, their history, and
+your automations — to keep working against the new hardware. The challenge is
+that a dongle identified by its **USB serial** cannot keep that identity: the
+serial lived in the dead dongle's EEPROM, so the replacement reports a different
+serial and the add-on advertises a **new** `unique_id` that the integration no
+longer recognizes. A dongle identified by its **USB port path** has no such
+problem if the replacement goes back into the same port (see the
+[identity trade-off](#identity-trade-off-serial-vs-usbpath) below).
+
+The procedure stamps the **replacement** dongle with a fresh random serial (never
+a clone of the dead one — two connected dongles must never share a serial), then
+re-links it in the integration:
+
+1. **Remove the dead dongle and plug in the replacement** (any port).
+
+2. **Stamp the replacement, if needed.** Pick the case that matches your
+   replacement dongle:
+
+    - **It carries a non-default serial you want to discard** (for example a
+      batch-shared serial it shipped with): set the **Force randomize serial**
+      (`force_randomize_serial`) option to the new dongle's **USB port path**
+      (e.g. `1-1.4` — the same identifier printed in the add-on log), and start
+      the add-on once. Like [Randomize default serial](#randomize-default-serial),
+      this is a one-time **flash-and-halt** maintenance step: it writes a fresh
+      random serial to that one radio and stops without starting `rtl_433`.
+      Then **clear the option**, **stop** the add-on, **unplug and replug** the
+      dongle so it re-reads its new serial, and **start** again.
+    - **It has a factory-default serial** (`00000000`/`00000001`): enable
+      [Randomize default serial](#randomize-default-serial) once instead — it
+      stamps every default-serial dongle with a fresh random serial.
+    - **It is a no-EEPROM dongle going back into the same port** as the dead one:
+      skip stamping entirely. Its `usbpath:` identity is unchanged, so the
+      replacement is transparent and the integration still recognizes it.
+
+    As with *Randomize default serial*, stamping writes the dongle's EEPROM, and
+    the RTL2832U only re-reads its serial at USB power-on — so the new serial does
+    **not** take effect until you physically replug the dongle.
+
+3. **Read the new radio's identity.** On a normal boot the add-on logs a
+   copy-pasteable line per radio:
+
+    ```
+    Radio <id>: unique_id=<serial:…|usbpath:…> host=<host> port=<port>
+    ```
+
+    The same values are also written to a `radios.status` file in the add-on
+    config directory (`/addon_configs/rtl433/radios.status`), one tab-separated
+    line per radio, so you can read them without scraping the log.
+
+4. **Re-link in Home Assistant.** In the
+   [rtl_433 integration](https://github.com/rtl-433-hass/rtl_433), run its
+   **Replace radio / reconfigure** workflow and point the existing hub entry at
+   the new radio's `unique_id` and `host:port` from the previous step. Your
+   decoded sensor entities, their history, and automations are preserved.
+
+#### Identity trade-off (`serial:` vs `usbpath:`)
+
+The two stable identities the add-on can assign behave differently when hardware
+changes:
+
+ - **`serial:`** survives moving the dongle between USB ports, but the identity
+   **dies with the dongle** (the serial lived in its EEPROM), so a replacement
+   always needs the reconfigure step above.
+ - **`usbpath:`** survives swapping a dongle **in the same port** (the new dongle
+   inherits the identity transparently), but **breaks if the dongle moves** to a
+   different port.
+
+Practical guidance: if you never rearrange USB ports, you may prefer relying on
+`usbpath:` identity — keep each dongle in a fixed port and a same-port swap needs
+no stamping and no reconfigure. If you do rearrange ports, assign unique serials
+and accept the reconfigure step when a serial-identified dongle is replaced.
+
 ### Non-RTL-SDR radios (SoapySDR / HackRF)
 
 Auto-detection only finds **RTL-SDR** dongles, so SoapySDR/HackRF (and other non-RTL-SDR) devices must be declared manually. Create a config file in the add-on config directory that contains its own `device` line with the appropriate device string — for example `hackrf.conf`:
