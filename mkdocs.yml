@@ -1,0 +1,41 @@
+site_name: rtl_433 Home Assistant Add-ons
+site_url: https://rtl-433-hass.github.io/rtl_433-hass-addons/
+repo_url: https://github.com/rtl-433-hass/rtl_433-hass-addons
+repo_name: rtl-433-hass/rtl_433-hass-addons
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - navigation.sections
+  palette:
+    - scheme: default
+      primary: blue grey
+      accent: light blue
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: slate
+      primary: blue grey
+      accent: light blue
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+extra:
+  version:
+    provider: mike
+
+markdown_extensions:
+  - admonition
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Configuration: configuration.md
+  - Advanced: advanced.md
