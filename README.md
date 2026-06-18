@@ -5,6 +5,8 @@ This is a collection of Home Assistant add-ons that work with [rtl_433](https://
 * [How to add this add-on repository to your Home Assistant install](https://home-assistant.io/hassio/installing_third_party_addons/)
 * Use `https://github.com/rtl-433-hass/rtl_433-hass-addons` as the URL for the repository.
 
+Full add-on documentation is published at <https://rtl-433-hass.github.io/rtl_433-hass-addons/latest/>.
+
 ## Running the Development Version
 
 - First, follow the tutorial at [Tutorial: Making your first add-on](https://developers.home-assistant.io/docs/add-ons/tutorial/) to learn how to build a basic addon.
