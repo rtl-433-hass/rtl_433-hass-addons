@@ -21,4 +21,3 @@ Valid status transitions:
 - `in-progress` → `completed` (successful execution)
 - `in-progress` → `failed` (execution error)
 - `failed` → `in-progress` (retry attempt)
-
