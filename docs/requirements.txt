@@ -1,2 +1,3 @@
-mkdocs-material
-mike
+mkdocs>=1.6,<2
+mkdocs-material>=9.7,<10
+mike>=2.2,<3
