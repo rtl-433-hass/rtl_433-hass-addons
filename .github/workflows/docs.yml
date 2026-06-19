@@ -32,18 +32,13 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           python-version: "3.14"
-          cache: pip
-          cache-dependency-path: docs/requirements.txt
-
-      - name: Install docs dependencies
-        run: python -m pip install -r docs/requirements.txt
 
       - name: Build docs
-        run: mkdocs build --strict
+        run: uv run --with-requirements docs/requirements.txt mkdocs build --strict
 
   publish:
     name: Publish docs
@@ -61,15 +56,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           python-version: "3.14"
-          cache: pip
-          cache-dependency-path: docs/requirements.txt
-
-      - name: Install docs dependencies
-        run: python -m pip install -r docs/requirements.txt
 
       - name: Configure Git author
         run: |
@@ -82,11 +72,11 @@ jobs:
           set -euo pipefail
 
           if [[ "$GITHUB_REF" == "refs/heads/main" ]]; then
-            mike deploy --push dev
+            uv run --with-requirements docs/requirements.txt mike deploy --push dev
           elif [[ "$GITHUB_REF_NAME" =~ ^v([0-9]+)\.([0-9]+)\.[0-9]+$ ]]; then
             version="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
-            mike deploy --push --update-aliases "$version" latest
-            mike set-default --push latest
+            uv run --with-requirements docs/requirements.txt mike deploy --push --update-aliases "$version" latest
+            uv run --with-requirements docs/requirements.txt mike set-default --push latest
           else
             echo "Unsupported docs publishing ref: $GITHUB_REF" >&2
             exit 1
