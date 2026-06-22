@@ -32,7 +32,9 @@ Radio <id> -> HTTP port <port>. To customize, create /config/<id>.conf.
 Radio <id>: unique_id=<serial:...|usbpath:...> host=<host> port=<port>
 ```
 
-The `<id>` identifies the radio for per-radio override files. The `unique_id`, host, and port identify the radio for the Home Assistant integration.
+The `<id>` identifies the radio for per-radio override files. The `unique_id` — shown as either a `serial:` or a `usbpath:` value — together with the host and port identifies the radio for the Home Assistant integration.
+
+The log writes the override path as `/config/<id>.conf`. That is the path *inside the add-on*; when you browse from Home Assistant (File Editor, Samba, or the VS Code add-on) the same file lives at `/addon_configs/<slug>/<id>.conf`, **not** in Home Assistant's own `/config` folder. See [Per-Radio Overrides](configuration.md#per-radio-overrides).
 
 ## Connect Home Assistant
 
