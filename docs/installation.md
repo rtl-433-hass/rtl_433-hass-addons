@@ -16,7 +16,7 @@ The upstream rtl_433 hardware and protocol references are useful when choosing r
 
 ## Add the Repository
 
-1. In Home Assistant, open **Settings -> Add-ons -> Add-on Store**.
+1. In Home Assistant, open **Settings -> Apps -> App Store** (called **Settings -> Add-ons -> Add-on Store** before Home Assistant 2026.2).
 2. Open the menu and choose **Repositories**.
 3. Add `https://github.com/rtl-433-hass/rtl_433-hass-addons`.
 4. Install `rtl_433` for the stable add-on, or `rtl_433 (next)` if you intentionally want the development build.
