@@ -6,23 +6,23 @@ The default configuration is intentionally usable without file editing. The add-
 
 | Option | Default | Purpose |
 | --- | --- | --- |
-| `disable_tpms` | `true` | Disable noisy TPMS decoders that can flood Home Assistant with passing cars. |
+| `disable_tpms` | `true` | Disable noisy TPMS (tire-pressure monitoring) decoders that can flood Home Assistant with passing cars. |
 | `log_received_messages` | `false` | Add `output kv` so decoded sensor events appear in the add-on log. |
 | `log_diagnostic_messages` | `false` | Add `output log` so rtl_433 diagnostics appear in the add-on log. |
-| `correct_ppm_offset` | `false` | Measure and apply each RTL-SDR dongle's crystal PPM offset. |
+| `correct_ppm_offset` | `false` | Measure and correct each RTL-SDR dongle's frequency error (PPM offset) so a slightly off-frequency radio still decodes sensors. |
 | `detect_noise_floor` | `false` | Sweep the configured bands with `rtl_power` and write noise reports. |
 | `noise_floor_bands` | `433.92M,868M,915M` | Comma-separated center frequencies for noise-floor scans. |
 | `noise_floor_duration` | `30` | Seconds to sample each band during a noise-floor scan. |
-| `randomize_default_serial` | `false` | One-time maintenance mode that writes unique serials to factory-default RTL-SDR dongles and halts. |
-| `force_randomize_serial` | empty | One-time maintenance mode that writes a fresh random serial to the dongle at one USB port path and halts. |
+| `randomize_default_serial` | `false` | One-time maintenance mode that writes unique serials to factory-default RTL-SDR dongles, then stops without starting rtl_433. |
+| `force_randomize_serial` | empty | One-time maintenance mode that writes a fresh random serial to the dongle at one USB port path, then stops without starting rtl_433. |
 
 ## Disable TPMS Sensors
 
-Passing cars constantly broadcast TPMS data. With `disable_tpms` enabled, the add-on appends generated `protocol -<n>` lines to every radio config to disable known TPMS decoders for the bundled rtl_433 version.
+Tire-pressure sensors in passing cars constantly broadcast TPMS data. With `disable_tpms` enabled, the add-on appends generated `protocol -<n>` lines to every radio config to disable known TPMS decoders for the bundled rtl_433 version.
 
 When `disable_tpms` is off, the add-on emits no protocol lines, so rtl_433 enables every decoder it ships.
 
-Protocol selection in rtl_433 is subtractive or exclusive, never additive. A negative `protocol -<n>` disables one decoder. A positive `protocol <n>` switches rtl_433 into "only these protocols" mode. That means an override such as `protocol 40` decodes only protocol 40; it does not add protocol 40 to the defaults.
+**You cannot add a single decoder on top of the defaults.** Protocol selection is only ever subtractive or exclusive, never additive: a `protocol -<n>` line turns one decoder off, while a positive `protocol <n>` line switches rtl_433 into "only these protocols" mode. So an override such as `protocol 40` decodes **only** protocol 40 and drops everything else; it does not add protocol 40 to the defaults.
 
 ## Per-Radio Overrides
 
@@ -62,7 +62,7 @@ For the full rtl_433 config syntax, see [rtl_433.example.conf](https://github.co
 
 ## Correct PPM Offset
 
-Every RTL-SDR dongle's crystal oscillator is slightly off-frequency. `correct_ppm_offset` measures that error with `rtl_test` and injects the measured value as a `ppm_error` directive.
+Every RTL-SDR dongle's crystal oscillator is slightly off-frequency, so the radio can tune a little above or below the frequency you ask for — sometimes enough to stop weak sensors from decoding. `correct_ppm_offset` measures that error with `rtl_test` and injects the measured value as a `ppm_error` directive.
 
 When enabled:
 
@@ -83,7 +83,7 @@ While enabled:
 
 - Every radio is scanned on every boot.
 - Radios are scanned one after another.
-- Startup is paused by roughly `noise_floor_duration * number of bands` per radio.
+- Each radio adds about `noise_floor_duration × number of bands` seconds to startup.
 - Timestamped reports are written to the add-on config directory.
 
 For each radio and run, the add-on writes:
