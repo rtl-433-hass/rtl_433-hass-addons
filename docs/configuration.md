@@ -39,6 +39,8 @@ Create `<id>.conf` in the add-on config directory, not in Home Assistant's main 
 | `rtl_433` | `/addon_configs/rtl433/` |
 | `rtl_433 (next)` | `/addon_configs/rtl433-next/` |
 
+The add-on log refers to this directory as `/config` because that is its path *inside the add-on container*. From Home Assistant — the File Editor, Samba, or the VS Code add-on — the same directory is `/addon_configs/<slug>/`, **not** Home Assistant's own top-level `/config` folder. Both are called `/config` from different vantage points, so always create `<id>.conf` under `/addon_configs/...`.
+
 Put only the extra directives you want in the override file. The add-on appends the override to the internal default config, and rtl_433 applies the last matching directive.
 
 Example:
