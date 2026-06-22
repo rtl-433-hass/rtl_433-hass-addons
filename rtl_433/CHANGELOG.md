@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.1
+
+_2026-06-22_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.8.0...v0.8.1)
+
+
+### Documentation
+
+* link the add-on's integration reference to its published docs ([8035049](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/8035049e85822b9d9d596cc5d5971b20963d76f3))
+
 ## 0.8.0
 
 _2026-06-04_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.7.4...v0.8.0)
