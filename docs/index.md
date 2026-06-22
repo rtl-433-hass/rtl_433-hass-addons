@@ -8,7 +8,7 @@ The default add-on works with no file editing: install it, plug in one or more R
 
 | Add-on | Purpose |
 | --- | --- |
-| `rtl_433` | Stable add-on built from released add-on versions. |
+| `rtl_433` | The stable version of this add-on, including the most recent stable version of rtl_433. |
 | `rtl_433 (next)` | Development add-on built from `main` and the current upstream rtl_433 source. |
 
 ## How It Works
