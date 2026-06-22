@@ -75,7 +75,7 @@ The `radios` array is the current start's roster, not a durable inventory. A tem
 
 ## Migration From the Old Config Path
 
-Earlier add-on versions read config files from `/config/rtl_433/` in Home Assistant's main config directory. That path is no longer read.
+Previous add-ons read config files from `/config/rtl_433/` in Home Assistant's main config directory. That path is no longer read.
 
 Move any per-radio tuning into `<id>.conf` files in the add-on config directory:
 
