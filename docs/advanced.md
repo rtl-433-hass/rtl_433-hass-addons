@@ -32,7 +32,7 @@ Both options default to off and can be enabled independently. Use received-messa
 
 The baked-in default config enables rtl_433 level reporting with `report_meta level`. Decoded messages include per-transmission frequency, RSSI, SNR, and noise values.
 
-The companion Home Assistant integration exposes these values as optional diagnostic sensors on decoded devices. They are disabled by default; enable them from each device page when you need signal-quality history.
+The companion Home Assistant integration exposes these values as optional [diagnostic sensors](https://rtl-433-hass.github.io/rtl_433/latest/diagnostics/) on decoded devices. They are disabled by default; enable them from each device page when you need signal-quality history.
 
 ## Discovery Payload Contract
 
