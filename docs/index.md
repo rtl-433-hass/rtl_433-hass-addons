@@ -2,7 +2,7 @@
 
 These add-ons run [rtl_433](https://github.com/merbanan/rtl_433) under the Home Assistant Supervisor so Home Assistant can receive data from wireless sensors through SDR radios.
 
-The default add-on works with no file editing: install it, plug in one or more RTL-SDR dongles, start the add-on, and connect the companion [rtl_433 Home Assistant integration](https://github.com/rtl-433-hass/rtl_433) to the radio WebSocket endpoints.
+The default add-on works with no file editing: install it, plug in one or more RTL-SDR dongles, start the add-on, and connect the companion [rtl_433 Home Assistant integration](https://rtl-433-hass.github.io/rtl_433/latest/) to the radio WebSocket endpoints.
 
 ## Add-ons
 

@@ -7,7 +7,7 @@ You need:
 1. Home Assistant OS or another Supervisor-based installation that supports add-ons.
 2. An SDR supported by rtl_433, usually an RTL-SDR USB dongle.
 3. Wireless sensors supported by rtl_433.
-4. The companion [rtl_433 Home Assistant integration](https://github.com/rtl-433-hass/rtl_433) to create Home Assistant devices and entities from the decoded data.
+4. The companion [rtl_433 Home Assistant integration](https://rtl-433-hass.github.io/rtl_433/latest/) to create Home Assistant devices and entities from the decoded data.
 
 The upstream rtl_433 hardware and protocol references are useful when choosing radios and sensors:
 
@@ -36,7 +36,7 @@ The `<id>` identifies the radio for per-radio override files. The `unique_id`, h
 
 ## Connect Home Assistant
 
-Install the companion [rtl_433 integration](https://github.com/rtl-433-hass/rtl_433) and add one hub per radio. The default connection values are:
+Install the companion [rtl_433 integration](https://rtl-433-hass.github.io/rtl_433/latest/) and add one hub per radio. The default connection values are:
 
 | Field | Value |
 | --- | --- |
