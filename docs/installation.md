@@ -7,12 +7,16 @@ You need:
 1. Home Assistant OS or another Supervisor-based installation that supports add-ons.
 2. An SDR supported by rtl_433, usually an RTL-SDR USB dongle.
 3. Wireless sensors supported by rtl_433.
-4. The companion [rtl_433 Home Assistant integration](https://rtl-433-hass.github.io/rtl_433/latest/) to create Home Assistant devices and entities from the decoded data.
+4. The companion [rtl_433 Home Assistant integration](https://rtl-433-hass.github.io/rtl_433/latest/) to create Home Assistant devices and entities from the decoded data. Install it [before starting the add-on](#install-the-integration-first).
 
 The upstream rtl_433 hardware and protocol references are useful when choosing radios and sensors:
 
 - [rtl_433 hardware documentation](https://triq.org/rtl_433/HARDWARE.html)
 - [rtl_433 supported protocols](https://github.com/merbanan/rtl_433/blob/master/README.md)
+
+## Install the Integration First
+
+Install the companion [rtl_433 integration](https://rtl-433-hass.github.io/rtl_433/latest/installation/) and restart Home Assistant *before* starting the add-on. The order matters: the add-on publishes Supervisor discovery data for each radio when it starts, and the discovered **rtl_433** cards only appear if the integration is already loaded. With the integration in place first, every radio shows up under **Settings -> Devices & Services** ready to add with one click — no host or port needs to be typed.
 
 ## Add the Repository
 
@@ -38,7 +42,9 @@ The log writes the override path as `/config/<id>.conf`. That is the path *insid
 
 ## Connect Home Assistant
 
-Install the companion [rtl_433 integration](https://rtl-433-hass.github.io/rtl_433/latest/) and add one hub per radio. The default connection values are:
+If the [integration was installed first](#install-the-integration-first), each detected radio appears as a discovered **rtl_433** card under **Settings -> Devices & Services**. Click **Add** and confirm — that's it.
+
+If no discovery card appears (for example, the integration was installed after the add-on started), install the integration, restart Home Assistant, and then restart the add-on so it republishes discovery. Alternatively, add one hub per radio manually with these values:
 
 | Field | Value |
 | --- | --- |

@@ -2,7 +2,7 @@
 
 These add-ons run [rtl_433](https://github.com/merbanan/rtl_433) under the Home Assistant Supervisor so Home Assistant can receive data from wireless sensors through software-defined radio (SDR) receivers.
 
-The default add-on works with no file editing: install it, plug in one or more RTL-SDR dongles, start the add-on, and connect the companion [rtl_433 Home Assistant integration](https://rtl-433-hass.github.io/rtl_433/latest/) to the radio WebSocket endpoints.
+The default add-on works with no file editing: install the companion [rtl_433 Home Assistant integration](https://rtl-433-hass.github.io/rtl_433/latest/) and restart Home Assistant, then install this add-on, plug in one or more RTL-SDR dongles, and start it. Each radio is discovered automatically in Home Assistant — no connection details to type.
 
 ## Add-ons
 
@@ -15,7 +15,7 @@ The default add-on works with no file editing: install it, plug in one or more R
 
 On startup the add-on auto-detects every connected RTL-SDR dongle and launches one rtl_433 process per radio. (Throughout these docs, a *radio* is a single rtl_433 process bound to one device — usually a dongle, but also a manually declared SoapySDR or HackRF device.) Each radio gets an HTTP/WebSocket endpoint with a predictable TCP port starting at `8433`; the second radio gets `8434`, and so on, up to the configured port range.
 
-The add-on publishes Supervisor discovery data for each radio on a best-effort basis. The companion integration consumes that discovery data when available, or you can add the integration manually with the add-on host, port, and `/ws` path.
+The add-on publishes Supervisor discovery data for each radio on a best-effort basis. The companion integration consumes that discovery data when available — install the integration and restart Home Assistant before starting the add-on so the integration is loaded when discovery is published — or you can add a hub manually with the add-on host, port, and `/ws` path.
 
 ## Start Here
 
