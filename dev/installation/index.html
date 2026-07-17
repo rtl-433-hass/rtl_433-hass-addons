@@ -360,6 +360,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#install-the-integration-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install the Integration First
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#add-the-repository" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -503,6 +514,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#install-the-integration-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install the Integration First
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#add-the-repository" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -573,13 +595,15 @@
 <li>Home Assistant OS or another Supervisor-based installation that supports add-ons.</li>
 <li>An SDR supported by rtl_433, usually an RTL-SDR USB dongle.</li>
 <li>Wireless sensors supported by rtl_433.</li>
-<li>The companion <a href="https://rtl-433-hass.github.io/rtl_433/latest/">rtl_433 Home Assistant integration</a> to create Home Assistant devices and entities from the decoded data.</li>
+<li>The companion <a href="https://rtl-433-hass.github.io/rtl_433/latest/">rtl_433 Home Assistant integration</a> to create Home Assistant devices and entities from the decoded data. Install it <a href="#install-the-integration-first">before starting the add-on</a>.</li>
 </ol>
 <p>The upstream rtl_433 hardware and protocol references are useful when choosing radios and sensors:</p>
 <ul>
 <li><a href="https://triq.org/rtl_433/HARDWARE.html">rtl_433 hardware documentation</a></li>
 <li><a href="https://github.com/merbanan/rtl_433/blob/master/README.md">rtl_433 supported protocols</a></li>
 </ul>
+<h2 id="install-the-integration-first">Install the Integration First<a class="headerlink" href="#install-the-integration-first" title="Permanent link">&para;</a></h2>
+<p>Install the companion <a href="https://rtl-433-hass.github.io/rtl_433/latest/installation/">rtl_433 integration</a> and restart Home Assistant <em>before</em> starting the add-on. The order matters: the add-on publishes Supervisor discovery data for each radio when it starts, and the discovered <strong>rtl_433</strong> cards only appear if the integration is already loaded. With the integration in place first, every radio shows up under <strong>Settings -&gt; Devices &amp; Services</strong> ready to add with one click — no host or port needs to be typed.</p>
 <h2 id="add-the-repository">Add the Repository<a class="headerlink" href="#add-the-repository" title="Permanent link">&para;</a></h2>
 <ol>
 <li>In Home Assistant, open <strong>Settings -&gt; Apps -&gt; App Store</strong> (called <strong>Settings -&gt; Add-ons -&gt; Add-on Store</strong> before Home Assistant 2026.2).</li>
@@ -599,7 +623,8 @@ Radio &lt;id&gt;: unique_id=&lt;serial:...|usbpath:...&gt; host=&lt;host&gt; por
 <p>The <code>&lt;id&gt;</code> identifies the radio for per-radio override files. The <code>unique_id</code> — shown as either a <code>serial:</code> or a <code>usbpath:</code> value — together with the host and port identifies the radio for the Home Assistant integration.</p>
 <p>The log writes the override path as <code>/config/&lt;id&gt;.conf</code>. That is the path <em>inside the add-on</em>; when you browse from Home Assistant (File Editor, Samba, or the VS Code add-on) the same file lives at <code>/addon_configs/&lt;slug&gt;/&lt;id&gt;.conf</code>, <strong>not</strong> in Home Assistant's own <code>/config</code> folder. See <a href="../configuration/#per-radio-overrides">Per-Radio Overrides</a>.</p>
 <h2 id="connect-home-assistant">Connect Home Assistant<a class="headerlink" href="#connect-home-assistant" title="Permanent link">&para;</a></h2>
-<p>Install the companion <a href="https://rtl-433-hass.github.io/rtl_433/latest/">rtl_433 integration</a> and add one hub per radio. The default connection values are:</p>
+<p>If the <a href="#install-the-integration-first">integration was installed first</a>, each detected radio appears as a discovered <strong>rtl_433</strong> card under <strong>Settings -&gt; Devices &amp; Services</strong>. Click <strong>Add</strong> and confirm — that's it.</p>
+<p>If no discovery card appears (for example, the integration was installed after the add-on started), install the integration, restart Home Assistant, and then restart the add-on so it republishes discovery. Alternatively, add one hub per radio manually with these values:</p>
 <table>
 <thead>
 <tr>

@@ -522,7 +522,7 @@
 
 <h1 id="rtl_433-home-assistant-add-ons">rtl_433 Home Assistant Add-ons<a class="headerlink" href="#rtl_433-home-assistant-add-ons" title="Permanent link">&para;</a></h1>
 <p>These add-ons run <a href="https://github.com/merbanan/rtl_433">rtl_433</a> under the Home Assistant Supervisor so Home Assistant can receive data from wireless sensors through software-defined radio (SDR) receivers.</p>
-<p>The default add-on works with no file editing: install it, plug in one or more RTL-SDR dongles, start the add-on, and connect the companion <a href="https://rtl-433-hass.github.io/rtl_433/latest/">rtl_433 Home Assistant integration</a> to the radio WebSocket endpoints.</p>
+<p>The default add-on works with no file editing: install the companion <a href="https://rtl-433-hass.github.io/rtl_433/latest/">rtl_433 Home Assistant integration</a> and restart Home Assistant, then install this add-on, plug in one or more RTL-SDR dongles, and start it. Each radio is discovered automatically in Home Assistant — no connection details to type.</p>
 <h2 id="add-ons">Add-ons<a class="headerlink" href="#add-ons" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -544,7 +544,7 @@
 </table>
 <h2 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
 <p>On startup the add-on auto-detects every connected RTL-SDR dongle and launches one rtl_433 process per radio. (Throughout these docs, a <em>radio</em> is a single rtl_433 process bound to one device — usually a dongle, but also a manually declared SoapySDR or HackRF device.) Each radio gets an HTTP/WebSocket endpoint with a predictable TCP port starting at <code>8433</code>; the second radio gets <code>8434</code>, and so on, up to the configured port range.</p>
-<p>The add-on publishes Supervisor discovery data for each radio on a best-effort basis. The companion integration consumes that discovery data when available, or you can add the integration manually with the add-on host, port, and <code>/ws</code> path.</p>
+<p>The add-on publishes Supervisor discovery data for each radio on a best-effort basis. The companion integration consumes that discovery data when available — install the integration and restart Home Assistant before starting the add-on so the integration is loaded when discovery is published — or you can add a hub manually with the add-on host, port, and <code>/ws</code> path.</p>
 <h2 id="start-here">Start Here<a class="headerlink" href="#start-here" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="installation/">Installation</a> covers installing the repository, starting the add-on, and connecting the integration.</li>
