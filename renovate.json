@@ -9,9 +9,29 @@
     {
       "matchPackageNames": ["merbanan/rtl_433"],
       "semanticCommitType": "feat"
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": [
+        "ghcr.io/home-assistant/amd64-base",
+        "ghcr.io/home-assistant/aarch64-base"
+      ],
+      "groupName": "home-assistant base image"
     }
   ],
   "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^rtl_433/build\\.json$/",
+        "/^rtl_433-next/build\\.json$/",
+        "/^\\.github/workflows/smoke-tests\\.yml$/"
+      ],
+      "matchStrings": [
+        "(?<depName>ghcr\\.io/home-assistant/[a-z0-9]+-base):(?<currentValue>[0-9]+\\.[0-9]+)"
+      ],
+      "datasourceTemplate": "docker"
+    },
     {
       "customType": "regex",
       "managerFilePatterns": ["/^\\.pre-commit-config\\.yaml$/"],
