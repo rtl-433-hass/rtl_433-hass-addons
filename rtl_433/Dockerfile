@@ -25,13 +25,18 @@ WORKDIR /build
 
 FROM builder AS rtl_433_builder
 
-RUN git clone https://github.com/merbanan/rtl_433
-WORKDIR /build/rtl_433
-
-# Build a specific commit or tag.
+# Build a specific commit, tag, or branch tip. CI resolves and passes the
+# current upstream commit SHA for the -next channel (whose build.json pins the
+# moving "master" ref) so this layer's build cache invalidates whenever master
+# advances; the stable channel defaults to a pinned release tag.
 ARG rtl433GitRevision=25.12
+# Clone and checkout in a single layer that references the revision so a new
+# revision busts the whole source fetch. Splitting them lets the build cache
+# reuse a stale clone — freezing the upstream source at the clone layer's cached
+# commit (or failing when checked out to a commit that clone predates).
 # hadolint ignore=DL3059
-RUN git checkout ${rtl433GitRevision}
+RUN git clone https://github.com/merbanan/rtl_433 \
+    && git -C rtl_433 checkout ${rtl433GitRevision}
 WORKDIR /build/rtl_433/build
 # hadolint ignore=DL3059
 RUN cmake ..

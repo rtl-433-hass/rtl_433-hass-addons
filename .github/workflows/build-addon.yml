@@ -119,15 +119,37 @@ jobs:
       env:
         ADDON: ${{ matrix.addon }}
         ARCH: ${{ matrix.arch }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         # The legacy home-assistant/builder action read build.json implicitly.
         # build-image only injects BUILD_ARCH/BUILD_VERSION, so pass BUILD_FROM
         # and any extra build args (e.g. rtl433GitRevision) from build.json here.
         build_from=$(jq -r --arg arch "${ARCH}" '.build_from[$arch]' "${ADDON}/build.json")
+
+        # The -next channel pins rtl433GitRevision to a moving ref ("master").
+        # Resolve it to the current upstream commit SHA so the Docker build cache
+        # key changes whenever master advances — otherwise the cached clone and
+        # compile layers freeze -next at a stale commit. A 40-hex SHA or a
+        # release tag (stable channel) passes through unchanged.
+        revision=$(jq -r '.args.rtl433GitRevision // empty' "${ADDON}/build.json")
+        if [ -n "${revision}" ] && ! printf '%s' "${revision}" | grep -Eq '^[0-9a-f]{40}$'; then
+          resolved=$(curl -fsSL \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github.sha" \
+            "https://api.github.com/repos/merbanan/rtl_433/commits/${revision}")
+          echo "Resolved merbanan/rtl_433 ${revision} -> ${resolved}"
+          revision="${resolved}"
+        fi
+
         {
           echo "build_args<<EOF"
           echo "BUILD_FROM=${build_from}"
-          jq -r '.args // {} | to_entries[] | "\(.key)=\(.value)"' "${ADDON}/build.json"
+          jq -r '.args // {} | to_entries[]
+                 | select(.key != "rtl433GitRevision")
+                 | "\(.key)=\(.value)"' "${ADDON}/build.json"
+          if [ -n "${revision}" ]; then
+            echo "rtl433GitRevision=${revision}"
+          fi
           echo "EOF"
         } >> "$GITHUB_OUTPUT"
 
