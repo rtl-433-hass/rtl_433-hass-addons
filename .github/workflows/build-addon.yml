@@ -82,7 +82,7 @@ jobs:
         ref: ${{ inputs.checkout-ref || github.ref }}
 
     - name: Inject slug/short variables
-      uses: rlespinasse/github-slug-action@ef93b2ea4b6405d06fd8684fc3ff795d262ecae8 # v5
+      uses: rlespinasse/github-slug-action@ef93b2ea4b6405d06fd8684fc3ff795d262ecae8 # v5.7.0
 
     - name: Copy shared files into -next variants
       env:
@@ -157,7 +157,7 @@ jobs:
     # that buildx can probe the registry build cache on non-pushing (test)
     # builds without hitting an anonymous 403.
     - name: Login to GitHub Container Registry
-      uses: docker/login-action@06fb636fac595d6fb4b28a5dfcb21a6f5091859c # v4
+      uses: docker/login-action@06fb636fac595d6fb4b28a5dfcb21a6f5091859c # v4.5.0
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
