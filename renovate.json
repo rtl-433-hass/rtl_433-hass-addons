@@ -5,6 +5,8 @@
     ":preserveSemverRanges",
     "helpers:pinGitHubActionDigests"
   ],
+  "internalChecksFilter": "strict",
+  "minimumReleaseAgeBehaviour": "timestamp-required",
   "packageRules": [
     {
       "matchPackageNames": ["merbanan/rtl_433"],
@@ -17,6 +19,28 @@
         "ghcr.io/home-assistant/aarch64-base"
       ],
       "groupName": "home-assistant base image"
+    },
+    {
+      "description": "Tagged action releases: cooldown, then automerge",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "minimumReleaseAge": "3 days",
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Major action bumps: cooldown, manual review",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["major"],
+      "minimumReleaseAge": "3 days",
+      "automerge": false
+    },
+    {
+      "description": "Pure digest moves: no timestamp available, always review",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["digest", "pinDigest", "pin"],
+      "automerge": false,
+      "dependencyDashboardApproval": true
     }
   ],
   "customManagers": [
