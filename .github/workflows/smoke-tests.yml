@@ -17,7 +17,7 @@ jobs:
       - name: Build rtl_433 image
         run: |
           docker build \
-            --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.21 \
+            --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.24 \
             --tag rtl_433-test:latest ./rtl_433
       - name: rtl_433 binary exists
         run: docker run --rm rtl_433-test:latest which rtl_433
