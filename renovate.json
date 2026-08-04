@@ -7,6 +7,8 @@
   ],
   "internalChecksFilter": "strict",
   "minimumReleaseAgeBehaviour": "timestamp-required",
+  "minimumReleaseAge": "3 days"
+  "automerge": true,
   "packageRules": [
     {
       "matchPackageNames": ["merbanan/rtl_433"],
@@ -23,17 +25,12 @@
     {
       "description": "Tagged action releases: cooldown, then automerge",
       "matchManagers": ["github-actions"],
-      "matchUpdateTypes": ["minor", "patch"],
-      "minimumReleaseAge": "3 days",
-      "automerge": true,
-      "automergeType": "pr"
+      "matchUpdateTypes": ["minor", "patch"]
     },
     {
       "description": "Major action bumps: cooldown, manual review",
       "matchManagers": ["github-actions"],
-      "matchUpdateTypes": ["major"],
-      "minimumReleaseAge": "3 days",
-      "automerge": false
+      "matchUpdateTypes": ["major"]
     },
     {
       "description": "Pure digest moves: no timestamp available, always review",
