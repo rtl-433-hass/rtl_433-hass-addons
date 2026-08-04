@@ -7,7 +7,7 @@
   ],
   "internalChecksFilter": "strict",
   "minimumReleaseAgeBehaviour": "timestamp-required",
-  "minimumReleaseAge": "3 days"
+  "minimumReleaseAge": "3 days",
   "automerge": true,
   "packageRules": [
     {
