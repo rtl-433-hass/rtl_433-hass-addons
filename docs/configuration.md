@@ -38,7 +38,16 @@ That path is the one to use as-is: the add-on resolves its own slug at startup a
 Add-on configuration directory: /addon_configs/<slug>/ (browse it with the File Editor, Samba, or the VS Code add-on; it is NOT Home Assistant's own /config folder).
 ```
 
-The `<slug>` is the add-on's full Supervisor slug — a repository identifier plus `rtl433` or `rtl433-next` — so it differs between installations. Inside the add-on container that same directory is mounted at `/config`, but Home Assistant's own top-level `/config` folder is a different directory entirely, so always create `<id>.conf` under `/addon_configs/...`.
+The `<slug>` is the add-on's full Supervisor slug: an eight-character hash of the add-on repository URL you added, followed by `_rtl433` or `_rtl433-next`. Adding the repository exactly as [the installation instructions](installation.md#add-the-repository) give it produces:
+
+| Add-on | Add-on config directory |
+| --- | --- |
+| `rtl_433` | `/addon_configs/f3f2f05c_rtl433/` |
+| `rtl_433 (next)` | `/addon_configs/f3f2f05c_rtl433-next/` |
+
+The hash covers the URL string character for character, so adding the repository with a trailing slash or a `.git` suffix — or installing the add-on locally — yields a different prefix. Treat the table as the typical case and the path in the add-on log as authoritative.
+
+Inside the add-on container that same directory is mounted at `/config`, but Home Assistant's own top-level `/config` folder is a different directory entirely, so always create `<id>.conf` under `/addon_configs/...`.
 
 Put only the extra directives you want in the override file. The add-on appends the override to the internal default config, and rtl_433 applies the last matching directive.
 
