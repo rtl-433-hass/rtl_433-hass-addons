@@ -38,8 +38,12 @@ ARG rtl433GitRevision=25.12
 RUN git clone https://github.com/merbanan/rtl_433 \
     && git -C rtl_433 checkout ${rtl433GitRevision}
 WORKDIR /build/rtl_433/build
+# Alpine 3.24 ships CMake 4, which dropped compatibility with projects whose
+# cmake_minimum_required() is below 3.5. Both rtl_433 (2.6) and SoapyHackRF
+# (2.8.7) still declare such minimums upstream, so raise the policy floor at
+# configure time instead of patching their CMakeLists.txt.
 # hadolint ignore=DL3059
-RUN cmake ..
+RUN cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 ..
 # hadolint ignore=DL3059
 RUN make -j 4
 
@@ -53,8 +57,9 @@ WORKDIR /build/SoapyHackRF
 # hadolint ignore=DL3059
 RUN git checkout 6c0c33f0aa44c3080674e6bca0273184d3e9eb44
 WORKDIR /build/SoapyHackRF/build
+# CMAKE_POLICY_VERSION_MINIMUM: see the rtl_433 build stage above.
 # hadolint ignore=DL3059
-RUN cmake ..
+RUN cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 ..
 # hadolint ignore=DL3059
 RUN make -j4
 # hadolint ignore=DL3059
