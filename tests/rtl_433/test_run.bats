@@ -837,7 +837,7 @@ surface_radio_status() {
         :
     else
         rm -f "$tmp" 2>/dev/null
-        bashio::log.warning "Could not write ${status_file} (non-fatal)."
+        bashio::log.warning "Could not write $(host_path "${status_file}") (non-fatal)."
     fi
 }
 
@@ -922,4 +922,102 @@ build_discovery_body() {
 
     # (e) Back-compat: the legacy top-level single-radio fields are still present.
     printf '%s' "$body" | jq -e '.config.host and .config.port and .config.path and .config.unique_id'
+}
+
+# --- resolve_addon_slug / host_path ------------------------------------------
+
+# Stub the Supervisor-facing dependencies for the slug lookup: curl records its
+# arguments to $CURL_LOG and prints $MOCK_INFO_BODY (the '/addons/self/info'
+# response body). The cache is cleared so each test starts from a cold lookup.
+slug_mocks() {
+    CURL_LOG="$BATS_TEST_TMPDIR/curl.log"
+    : > "$CURL_LOG"
+    MOCK_INFO_BODY='{"result": "ok", "data": {"slug": "local_rtl433", "hostname": "local-rtl433"}}'
+    curl() { printf '%s\n' "$*" >> "$CURL_LOG"; printf '%s' "$MOCK_INFO_BODY"; }
+    addon_slug=""
+    SUPERVISOR_TOKEN="tok"
+}
+
+@test "resolve_addon_slug reads the slug from the Supervisor info response" {
+    slug_mocks
+    run resolve_addon_slug
+    [ "$status" -eq 0 ]
+    [ "$output" = "local_rtl433" ]
+    grep -q "http://supervisor/addons/self/info" "$CURL_LOG"
+}
+
+@test "resolve_addon_slug takes the FIRST slug when the response carries several" {
+    slug_mocks
+    MOCK_INFO_BODY='{"result": "ok", "data": {"slug": "a1b2c3d4_rtl433", "repository": {"slug": "a1b2c3d4"}}}'
+    run resolve_addon_slug
+    [ "$status" -eq 0 ]
+    [ "$output" = "a1b2c3d4_rtl433" ]
+}
+
+@test "resolve_addon_slug caches the lookup so the Supervisor is queried once" {
+    slug_mocks
+    # Called directly (not via 'run') so the cache lands in this shell.
+    resolve_addon_slug > /dev/null
+    resolve_addon_slug > /dev/null
+    [ "$(wc -l < "$CURL_LOG")" -eq 1 ]
+}
+
+@test "resolve_addon_slug falls back to the hostname with '-' swapped for '_'" {
+    slug_mocks
+    unset SUPERVISOR_TOKEN
+    resolve_addon_host() { printf 'local-rtl433'; }
+    run resolve_addon_slug
+    [ "$status" -eq 0 ]
+    [ "$output" = "local_rtl433" ]
+    [ ! -s "$CURL_LOG" ]   # curl never called without a token
+}
+
+@test "resolve_addon_slug prints nothing when neither source resolves" {
+    slug_mocks
+    unset SUPERVISOR_TOKEN
+    resolve_addon_host() { printf ''; }
+    run resolve_addon_slug
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "host_path rewrites a config-dir path to the host /addon_configs view" {
+    slug_mocks
+    conf_directory="/config"
+    HOST_CONFIG_ROOT="/addon_configs"
+    run host_path "/config/serial_00000abc.conf"
+    [ "$status" -eq 0 ]
+    [ "$output" = "/addon_configs/local_rtl433/serial_00000abc.conf" ]
+}
+
+@test "host_path rewrites the config directory itself" {
+    slug_mocks
+    conf_directory="/config"
+    HOST_CONFIG_ROOT="/addon_configs"
+    run host_path "/config"
+    [ "$status" -eq 0 ]
+    [ "$output" = "/addon_configs/local_rtl433" ]
+}
+
+@test "host_path leaves a path outside the config directory unchanged" {
+    slug_mocks
+    conf_directory="/config"
+    HOST_CONFIG_ROOT="/addon_configs"
+    run host_path "/tmp/rtl_433/radio0.conf"
+    [ "$status" -eq 0 ]
+    [ "$output" = "/tmp/rtl_433/radio0.conf" ]
+    # A path that merely starts with the same characters is not under the mount.
+    run host_path "/configuration.yaml"
+    [ "$status" -eq 0 ]
+    [ "$output" = "/configuration.yaml" ]
+}
+
+@test "host_path falls back to the container path when the slug is unknown" {
+    slug_mocks
+    unset SUPERVISOR_TOKEN
+    resolve_addon_host() { printf ''; }
+    conf_directory="/config"
+    run host_path "/config/serial_00000abc.conf"
+    [ "$status" -eq 0 ]
+    [ "$output" = "/config/serial_00000abc.conf" ]
 }
