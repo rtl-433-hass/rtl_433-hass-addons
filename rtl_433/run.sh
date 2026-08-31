@@ -5,6 +5,14 @@
 # per-radio '<identifier>.conf' override files; the add-on never writes here.
 conf_directory="/config"
 
+# Host-visible root of the add-on config directories. The add-on sees its own
+# config directory mounted at $conf_directory, but the user reaches those same
+# files from Home Assistant (file editor, Samba, terminal) as
+# '/addon_configs/<addon-slug>/...'. Every path printed for the user is
+# translated with host_path() so the log never shows a container-only path.
+# Overridable so tests can point it elsewhere.
+HOST_CONFIG_ROOT="${HOST_CONFIG_ROOT:-/addon_configs}"
+
 # Internal default rtl_433 configuration baked into the image. Rendered configs
 # are built from this default plus an injected 'device' line and any matching
 # per-radio override file.
@@ -664,6 +672,71 @@ resolve_addon_host() {
     printf '%s' "$host"
 }
 
+# Cache for resolve_addon_slug so the Supervisor is queried at most once per run.
+addon_slug=""
+
+# Resolve this add-on's Supervisor slug ('<repository>_<slug>', e.g.
+# 'local_rtl433' or 'a1b2c3d4_rtl433'). That slug is also the directory name
+# under '/addon_configs' on the host, so it is what turns a container path into
+# the path the user actually sees. Prefers the Supervisor API (authoritative);
+# falls back to the add-on hostname, which is the same slug with '_' rendered as
+# '-'. Prints an empty string when neither is available (e.g. a local/test run
+# with no SUPERVISOR_TOKEN), which callers treat as "cannot translate".
+resolve_addon_slug() {
+    local hostname
+    if [ -n "$addon_slug" ]
+    then
+        printf '%s' "$addon_slug"
+        return 0
+    fi
+
+    if [ -n "${SUPERVISOR_TOKEN:-}" ]
+    then
+        # The body is split on commas first so a greedy '.*' cannot skip past
+        # the top-level "slug" to a later one nested in the response.
+        addon_slug="$(curl -s -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+            "http://supervisor/addons/self/info" 2>/dev/null \
+            | tr ',' '\n' \
+            | sed -n 's/.*"slug"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+            | head -n 1)"
+    fi
+
+    if [ -z "$addon_slug" ]
+    then
+        # The Supervisor derives the add-on hostname from the slug by swapping
+        # '_' for '-'; swapping back reconstructs the slug whenever the slug's
+        # own parts contain no dashes (true for this add-on).
+        hostname="$(resolve_addon_host)"
+        [ -n "$hostname" ] && addon_slug="${hostname//-/_}"
+    fi
+
+    printf '%s' "$addon_slug"
+}
+
+# Translate a container path into the path the user sees from Home Assistant, so
+# a logged path is one they can actually open. A path under $conf_directory
+# becomes '<HOST_CONFIG_ROOT>/<addon-slug>/...'; anything else (or any path at
+# all when the slug cannot be resolved) is printed unchanged.
+# Args: <container_path>.
+host_path() {
+    local path="$1" slug rest
+
+    case "$path" in
+        "$conf_directory"|"$conf_directory"/*) ;;
+        *) printf '%s' "$path"; return 0 ;;
+    esac
+
+    slug="$(resolve_addon_slug)"
+    if [ -z "$slug" ]
+    then
+        printf '%s' "$path"
+        return 0
+    fi
+
+    rest="${path#"$conf_directory"}"
+    printf '%s' "${HOST_CONFIG_ROOT}/${slug}${rest}"
+}
+
 # Extract the auto-measured PPM crystal offset from captured 'rtl_test -p' output.
 # rtl_test prints a refining 'cumulative PPM: <n>' line periodically; the LAST one
 # is its best estimate. Prints just that integer (which may be negative); prints
@@ -707,7 +780,7 @@ write_ppm_cache() {
         printf '%s\n' "$ppm"
         printf '# measured %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     } > "$file" 2>/dev/null \
-        || bashio::log.warning "Could not persist measured PPM offset to ${file}."
+        || bashio::log.warning "Could not persist measured PPM offset to $(host_path "${file}")."
 }
 
 # Return 0 if an override file exists and already declares a 'ppm_error'
@@ -893,6 +966,13 @@ main() {
     then
         noise_floor_duration=30
     fi
+
+    # Resolve (and cache) the add-on slug once, so every later host_path() call
+    # translates container paths into the '/addon_configs/<slug>/...' paths the
+    # user sees without re-querying the Supervisor. Called outside a command
+    # substitution so the cache lands in this shell.
+    resolve_addon_slug > /dev/null
+    bashio::log.info "Add-on config directory: $(host_path "$conf_directory")/"
 
     # Directory rendered configs are written to. Never the user config directory.
     mkdir -p "$render_dir"
@@ -1167,7 +1247,7 @@ main() {
     render_noise_png() {
         local csv="$1" png="$2" dat
         command -v gnuplot >/dev/null 2>&1 || {
-            bashio::log.warning "gnuplot not available; skipping noise-floor PNG ${png}."
+            bashio::log.warning "gnuplot not available; skipping noise-floor PNG $(host_path "${png}")."
             return 0
         }
         dat="$(mktemp 2>/dev/null)" || return 0
@@ -1183,12 +1263,12 @@ main() {
         ' "$csv" > "$dat" 2>/dev/null
         then
             rm -f "$dat"
-            bashio::log.warning "Could not flatten noise-floor CSV for ${png}; skipping plot."
+            bashio::log.warning "Could not flatten noise-floor CSV for $(host_path "${png}"); skipping plot."
             return 0
         fi
         if ! gnuplot -e "set terminal png; set output '${png}'; set xlabel 'Hz'; set ylabel 'dBm'; plot '${dat}' with lines" 2>/dev/null
         then
-            bashio::log.warning "gnuplot failed to render noise-floor PNG ${png} (non-fatal)."
+            bashio::log.warning "gnuplot failed to render noise-floor PNG $(host_path "${png}") (non-fatal)."
         fi
         rm -f "$dat"
     }
@@ -1236,14 +1316,14 @@ main() {
             fi
             # Accumulate the raw sweeps so the CSV/PNG cover every band.
             cat "$tmp" >> "$csv" 2>/dev/null \
-                || bashio::log.warning "Radio ${id}: could not write ${csv} (non-fatal)."
+                || bashio::log.warning "Radio ${id}: could not write $(host_path "${csv}") (non-fatal)."
             # A human-friendly label is the band's center in MHz.
             label="$(awk -F':' 'BEGIN { } { printf "%g MHz", (($1 + $2) / 2) / 1000000 }' <<<"$lo_hi_bin")"
             if stats="$(rtl_power_stats "$tmp")"
             then
                 read -r min median peak <<<"$stats"
                 printf '%s: min %s dBm, median %s dBm, peak %s dBm\n' "$label" "$min" "$median" "$peak" >> "$txt" 2>/dev/null \
-                    || bashio::log.warning "Radio ${id}: could not write ${txt} (non-fatal)."
+                    || bashio::log.warning "Radio ${id}: could not write $(host_path "${txt}") (non-fatal)."
                 bashio::log.info "Radio ${id} ${label} noise floor ~ ${median} dBm (peak ${peak})."
             else
                 bashio::log.warning "Radio ${id}: no usable readings for band ${label}."
@@ -1254,7 +1334,7 @@ main() {
         if [ -s "$csv" ]
         then
             render_noise_png "$csv" "$png"
-            bashio::log.info "Radio ${id}: noise-floor report written to ${csv} (and .txt/.png)."
+            bashio::log.info "Radio ${id}: noise-floor report written to $(host_path "${csv}") (and .txt/.png)."
         fi
     }
 
@@ -1333,7 +1413,7 @@ main() {
         # entry.
         unique_id="$(resolve_radio_unique_id "$selector" "$match_id")"
 
-        bashio::log.info "Radio ${match_id} -> HTTP port ${port}. To customize, create ${expected_file}."
+        bashio::log.info "Radio ${match_id} -> HTTP port ${port}. To customize, create $(host_path "${expected_file}")."
 
         # Inject the PPM crystal offset measured for this dongle by the parallel
         # pre-pass above (or set manually / cached on a previous boot). This only
@@ -1381,13 +1461,13 @@ main() {
 
         if ! grep -qE '^[[:space:]]*device[[:space:]]' "$f"
         then
-            bashio::log.warning "Config file ${f} matches no detected RTL-SDR radio and declares no 'device' line; ignoring it."
+            bashio::log.warning "Config file $(host_path "${f}") matches no detected RTL-SDR radio and declares no 'device' line; ignoring it."
             continue
         fi
 
         if [ "${#radio_ports[@]}" -ge "$MAX_RADIOS" ]
         then
-            bashio::log.warning "Maximum of ${MAX_RADIOS} radios reached; skipping explicitly-declared radio ${f}."
+            bashio::log.warning "Maximum of ${MAX_RADIOS} radios reached; skipping explicitly-declared radio $(host_path "${f}")."
             continue
         fi
 
@@ -1548,7 +1628,7 @@ main() {
             :
         else
             rm -f "$tmp" 2>/dev/null
-            bashio::log.warning "Could not write ${status_file} (non-fatal)."
+            bashio::log.warning "Could not write $(host_path "${status_file}") (non-fatal)."
         fi
     }
 
