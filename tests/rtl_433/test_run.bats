@@ -367,6 +367,68 @@ EOF
     [ "$output" = "1-1.4" ]
 }
 
+# --- resolve_addon_slug / host_conf_path -------------------------------------
+
+# The add-on config directory is '/config' inside the container but
+# '/addon_configs/<slug>/' when browsed from Home Assistant, so every path shown
+# to the user is translated. These cover both the slug lookup (bashio first,
+# then a direct Supervisor query) and the translation itself.
+
+@test "resolve_addon_slug prefers the slug bashio reports" {
+    bashio::addons() { printf 'a0d7b954_rtl433'; }
+    SUPERVISOR_TOKEN=""
+    run resolve_addon_slug
+    [ "$status" -eq 0 ]
+    [ "$output" = "a0d7b954_rtl433" ]
+}
+
+@test "resolve_addon_slug falls back to the Supervisor payload's first slug" {
+    bashio::addons() { printf 'null'; }
+    SUPERVISOR_TOKEN="token"
+    curl() { printf '{"result":"ok","data":{"slug":"a0d7b954_rtl433","repository":{"slug":"core"}}}'; }
+    run resolve_addon_slug
+    [ "$status" -eq 0 ]
+    [ "$output" = "a0d7b954_rtl433" ]
+}
+
+@test "resolve_addon_slug emits nothing without bashio or a Supervisor token" {
+    bashio::addons() { return 1; }
+    SUPERVISOR_TOKEN=""
+    run resolve_addon_slug
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "host_conf_path rewrites config-dir paths to the Home Assistant view" {
+    conf_directory="/config"
+    host_conf_directory="/addon_configs/a0d7b954_rtl433"
+    run host_conf_path "/config/1-1.4.conf"
+    [ "$status" -eq 0 ]
+    [ "$output" = "/addon_configs/a0d7b954_rtl433/1-1.4.conf" ]
+
+    run host_conf_path "/config"
+    [ "$output" = "/addon_configs/a0d7b954_rtl433" ]
+}
+
+@test "host_conf_path leaves paths outside the config directory alone" {
+    conf_directory="/config"
+    host_conf_directory="/addon_configs/a0d7b954_rtl433"
+    # Neither an internal render path nor a same-prefix sibling directory is
+    # part of the add-on config mount, so both must pass through unchanged.
+    run host_conf_path "/tmp/rtl_433/1-1.4.conf"
+    [ "$output" = "/tmp/rtl_433/1-1.4.conf" ]
+
+    run host_conf_path "/configuration/x.conf"
+    [ "$output" = "/configuration/x.conf" ]
+}
+
+@test "host_conf_path is a no-op when the slug could not be resolved" {
+    conf_directory="/config"
+    host_conf_directory="/config"
+    run host_conf_path "/config/1-1.4.conf"
+    [ "$output" = "/config/1-1.4.conf" ]
+}
+
 # --- parse_discovery_uuid ----------------------------------------------------
 
 @test "parse_discovery_uuid extracts the uuid from a POST /discovery response" {
