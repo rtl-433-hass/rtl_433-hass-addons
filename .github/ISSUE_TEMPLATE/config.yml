@@ -1,5 +1,11 @@
 blank_issues_enabled: true
 contact_links:
-  - name: Request new device support for Automatic Discovery
+  - name: Request support for a new sensor or device
     url: https://github.com/merbanan/rtl_433/issues
-    about: Automatic discovery is part of the rtl_433 project itself. Please request support for new devices there.
+    about: Decoding is done by rtl_433 itself. Please request support for new devices in the upstream rtl_433 project.
+  - name: Report a problem with Home Assistant devices or entities
+    url: https://github.com/rtl-433-hass/rtl_433/issues
+    about: Missing, incorrect, or duplicated Home Assistant devices and entities are created by the companion rtl_433 integration. Report those there.
+  - name: Read the add-on documentation
+    url: https://rtl-433-hass.github.io/rtl_433-hass-addons/latest/
+    about: Installation, configuration, per-radio overrides, PPM correction, and other advanced topics.
