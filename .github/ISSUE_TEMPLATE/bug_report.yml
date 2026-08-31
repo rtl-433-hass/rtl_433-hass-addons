@@ -1,15 +1,22 @@
-name: Report an issue with rtl_433 Home Assistant add-ons
+name: Report an issue with the rtl_433 Home Assistant add-ons
 description: Report an issue with the Home Assistant add-on itself.
 body:
   - type: markdown
     attributes:
       value: |
-        This issue form is for reporting bugs only!
+        This issue form is for reporting bugs in the add-on only!
 
         Before reporting a bug, please check:
 
-        1. Add `output kv` to your `rtl433` configuration file and confirm messages are being captured.
-        2. Check that messages are being sent to your MQTT broker using a tool such as [MQTT Explorer](https://mqtt-explorer.com).
+        1. The add-on log shows one `Radio <id> -> HTTP port <port>` line for each
+           dongle you expect the add-on to use.
+        2. Turning on the `log_received_messages` add-on option makes decoded
+           sensor events appear in the add-on log.
+
+        If the add-on decodes your sensors but Home Assistant does not show the
+        devices or entities you expect, report that against the companion
+        [rtl_433 integration](https://github.com/rtl-433-hass/rtl_433/issues)
+        instead.
 
   - type: textarea
     validations:
@@ -29,27 +36,38 @@ body:
     validations:
       required: true
     attributes:
-      label: What addon are you reporting the bug for?
+      label: What add-on are you reporting the bug for?
       description: >
-        Are you experiencing a bug with the rtl_433 add-on?
+        The `rtl_433 (next)` add-on is the rolling development build.
       options:
         - rtl_433
+        - rtl_433 (next)
   - type: input
     attributes:
-      label: What is the addon version?
-      placeholder: 0.2.3
-    validations:
-      required: true
-  - type: dropdown
-    validations:
-      required: true
-    attributes:
-      label: What type of MQTT Broker are you using?
+      label: What is the add-on version?
       description: >
-        Are you using the Home Assistant Mosquitto addon or something else?
-      options:
-        - Home Assistant Mosquitto MQTT Broker
-        - Other (details in the bug description)
+        Shown on the add-on page in Home Assistant. Use `next` for the
+        development add-on, and include the rtl_433 version line from the log if
+        you have it.
+      placeholder: 0.8.1
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: What is your Home Assistant version?
+      description: >
+        Found under Settings -> System -> Repairs -> menu -> System information.
+      placeholder: "2026.8.0"
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: What SDR hardware are you using?
+      description: >
+        Include every radio connected to the host if you run more than one.
+      placeholder: RTL-SDR Blog V4
+    validations:
+      required: true
 
   - type: markdown
     attributes:
@@ -57,10 +75,21 @@ body:
         # Details
   - type: textarea
     attributes:
-      label: Addon log messages
-      placeholder: "Copy and paste the addon log here"
+      label: Add-on log messages
+      placeholder: "Copy and paste the add-on log here"
       description: >-
-        rtl_433 logs can be found in: [Settings -> Add-ons -> rtl_433](https://my.home-assistant.io/redirect/supervisor_addon/?addon=9b13b3f4_rtl433).
+        The log is on the add-on page under Settings -> Apps -> rtl_433 -> Log
+        (called Settings -> Add-ons before Home Assistant 2026.2). Turning on
+        `log_diagnostic_messages` adds rtl_433's own status and diagnostic
+        output, which is usually needed for startup and radio issues.
+      render: txt
+  - type: textarea
+    attributes:
+      label: Per-radio config overrides
+      description: >-
+        If you have any `<id>.conf` override files in the add-on config
+        directory (`/addon_configs/rtl433/`, or `/addon_configs/rtl433-next/`
+        for the development add-on), paste their contents here.
       render: txt
   - type: textarea
     attributes:
