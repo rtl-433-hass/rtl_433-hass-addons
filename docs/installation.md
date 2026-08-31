@@ -32,13 +32,14 @@ Install the companion [rtl_433 integration](https://rtl-433-hass.github.io/rtl_4
 3. Open the add-on log and look for one line per radio similar to:
 
 ```text
-Radio <id> -> HTTP port <port>. To customize, create /config/<id>.conf.
+Add-on config directory: /addon_configs/<slug>/
+Radio <id> -> HTTP port <port>. To customize, create /addon_configs/<slug>/<id>.conf.
 Radio <id>: unique_id=<serial:...|usbpath:...> host=<host> port=<port>
 ```
 
 The `<id>` identifies the radio for per-radio override files. The `unique_id` — shown as either a `serial:` or a `usbpath:` value — together with the host and port identifies the radio for the Home Assistant integration.
 
-The log writes the override path as `/config/<id>.conf`. That is the path *inside the add-on*; when you browse from Home Assistant (File Editor, Samba, or the VS Code add-on) the same file lives at `/addon_configs/<slug>/<id>.conf`, **not** in Home Assistant's own `/config` folder. See [Per-Radio Overrides](configuration.md#per-radio-overrides).
+The override path in the log is the path you browse from Home Assistant (File Editor, Samba, or the VS Code add-on) — the add-on's own config directory, **not** Home Assistant's top-level `/config` folder. See [Per-Radio Overrides](configuration.md#per-radio-overrides).
 
 ## Connect Home Assistant
 

@@ -25,4 +25,4 @@ Key pages:
 5. Each detected radio appears as a discovered **rtl_433** card under **Settings -> Devices & Services** — click **Add** and confirm.
 6. If no card appears, check the add-on log for each radio's host, port, and stable `unique_id` and add a hub manually. The first radio usually uses port `8433` and path `/ws`.
 
-Per-radio override files live in the add-on config directory, reachable as `/addon_configs/rtl433/`. The add-on log prints the exact `<id>.conf` filename for each detected radio.
+Per-radio override files live in the add-on's own config directory, `/addon_configs/<slug>/`. The add-on log prints that directory at startup and the exact `<id>.conf` path for each detected radio.

@@ -20,6 +20,6 @@ Start with:
 
 The add-on works like the stable channel: it auto-detects RTL-SDR dongles, starts one rtl_433 process per radio, and exposes each radio at `/ws` on ports starting at `8433`.
 
-Per-radio override files live in `/addon_configs/rtl433-next/`. The add-on log prints the exact `<id>.conf` filename for each detected radio.
+Per-radio override files live in the add-on's own config directory, `/addon_configs/<slug>/`. The add-on log prints that directory at startup and the exact `<id>.conf` path for each detected radio.
 
 To see which upstream rtl_433 commit was built, check the rtl_433 version line in the add-on log and drop the leading `g` from the reported commit token.

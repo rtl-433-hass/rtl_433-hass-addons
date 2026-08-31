@@ -79,12 +79,13 @@ The `radios` array is the current start's roster, not a durable inventory. A tem
 
 Previous add-ons read config files from `/config/rtl_433/` in Home Assistant's main config directory. That path is no longer read.
 
-Move any per-radio tuning into `<id>.conf` files in the add-on config directory:
+Move any per-radio tuning into `<id>.conf` files in the add-on's own config directory, which the add-on prints at startup:
 
-| Add-on | Current config directory |
-| --- | --- |
-| `rtl_433` | `/addon_configs/rtl433/` |
-| `rtl_433 (next)` | `/addon_configs/rtl433-next/` |
+```text
+Add-on config directory: /addon_configs/<slug>/
+```
+
+`<slug>` is the add-on's Supervisor slug (its own slug prefixed with the repository it was installed from, such as `local_rtl433` or `1a2b3c4d_rtl433`), so take the exact directory from the log.
 
 There is no separate config file required for the default case. The default rtl_433 config is baked into the image, and per-radio files only contain overrides or manual device declarations.
 
