@@ -29,17 +29,16 @@ When `disable_tpms` is off, the add-on emits no protocol lines, so rtl_433 enabl
 Each detected radio's exact override filename is printed in the add-on log:
 
 ```text
-Radio <id> -> HTTP port <port>. To customize, create /config/<id>.conf.
+Radio <id> -> HTTP port <port>. To customize, create /addon_configs/<slug>/<id>.conf.
 ```
 
-Create `<id>.conf` in the add-on config directory, not in Home Assistant's main config directory:
+That path is the one to use as-is: the add-on resolves its own slug at startup and prints the directory the way you see it from Home Assistant (the File Editor, Samba, or the VS Code add-on). The add-on also logs the directory once on its own line when it starts:
 
-| Add-on | Add-on config directory |
-| --- | --- |
-| `rtl_433` | `/addon_configs/rtl433/` |
-| `rtl_433 (next)` | `/addon_configs/rtl433-next/` |
+```text
+Add-on configuration directory: /addon_configs/<slug>/ (browse it with the File Editor, Samba, or the VS Code add-on; it is NOT Home Assistant's own /config folder).
+```
 
-The add-on log refers to this directory as `/config` because that is its path *inside the add-on container*. From Home Assistant — the File Editor, Samba, or the VS Code add-on — the same directory is `/addon_configs/<slug>/`, **not** Home Assistant's own top-level `/config` folder. Both are called `/config` from different vantage points, so always create `<id>.conf` under `/addon_configs/...`.
+The `<slug>` is the add-on's full Supervisor slug — a repository identifier plus `rtl433` or `rtl433-next` — so it differs between installations. Inside the add-on container that same directory is mounted at `/config`, but Home Assistant's own top-level `/config` folder is a different directory entirely, so always create `<id>.conf` under `/addon_configs/...`.
 
 Put only the extra directives you want in the override file. The add-on appends the override to the internal default config, and rtl_433 applies the last matching directive.
 
