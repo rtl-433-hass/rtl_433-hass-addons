@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.2
+
+_2026-09-01_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.8.1...v0.8.2)
+
+
+### Bug Fixes
+
+* print add-on config paths as Home Assistant sees them ([#143](https://github.com/rtl-433-hass/rtl_433-hass-addons/issues/143)) ([00360ac](https://github.com/rtl-433-hass/rtl_433-hass-addons/commit/00360ac0531383581f2a6d702c996508280365aa))
+
 ## 0.8.1
 
 _2026-06-22_ · [Compare](https://github.com/rtl-433-hass/rtl_433-hass-addons/compare/v0.8.0...v0.8.1)
