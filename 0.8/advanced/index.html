@@ -19,7 +19,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -27,7 +27,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -612,27 +612,27 @@ frequency 433.92M
 <p>The add-on publishes a Supervisor discovery message for the <code>rtl_433</code> service. The top-level fields keep the original single-radio shape for compatibility, and the <code>radios</code> array describes every launched radio.</p>
 <p>Example:</p>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;service&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;rtl_433&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;host&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&lt;addon-hostname&gt;&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;port&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8434</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/ws&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;secure&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;unique_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;serial:abcd1234&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;radios&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">  </span><span class="nt">"service"</span><span class="p">:</span><span class="w"> </span><span class="s2">"rtl_433"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"config"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"host"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;addon-hostname&gt;"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"port"</span><span class="p">:</span><span class="w"> </span><span class="mi">8434</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/ws"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"secure"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"unique_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"serial:abcd1234"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"radios"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">      </span><span class="p">{</span>
-<span class="w">        </span><span class="nt">&quot;unique_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;serial:abcd1234&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;port&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8433</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/ws&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;serial&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;abcd1234&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;usbpath&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1-1.4&quot;</span>
+<span class="w">        </span><span class="nt">"unique_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"serial:abcd1234"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"port"</span><span class="p">:</span><span class="w"> </span><span class="mi">8433</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/ws"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"serial"</span><span class="p">:</span><span class="w"> </span><span class="s2">"abcd1234"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"usbpath"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1-1.4"</span>
 <span class="w">      </span><span class="p">},</span>
 <span class="w">      </span><span class="p">{</span>
-<span class="w">        </span><span class="nt">&quot;unique_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;usbpath:1-1.2&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;port&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8434</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/ws&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;serial&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;usbpath&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1-1.2&quot;</span>
+<span class="w">        </span><span class="nt">"unique_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"usbpath:1-1.2"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"port"</span><span class="p">:</span><span class="w"> </span><span class="mi">8434</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/ws"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"serial"</span><span class="p">:</span><span class="w"> </span><span class="s2">""</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"usbpath"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1-1.2"</span>
 <span class="w">      </span><span class="p">}</span>
 <span class="w">    </span><span class="p">]</span>
 <span class="w">  </span><span class="p">}</span>
@@ -642,25 +642,7 @@ frequency 433.92M
 <p>The <code>radios</code> array is the current start's roster, not a durable inventory. A temporarily missing dongle is absent from that roster; consumers should treat a new unbound radio as the replacement signal rather than treating absence as permanent removal.</p>
 <h2 id="migration-from-the-old-config-path">Migration From the Old Config Path<a class="headerlink" href="#migration-from-the-old-config-path" title="Permanent link">&para;</a></h2>
 <p>Previous add-ons read config files from <code>/config/rtl_433/</code> in Home Assistant's main config directory. That path is no longer read.</p>
-<p>Move any per-radio tuning into <code>&lt;id&gt;.conf</code> files in the add-on config directory:</p>
-<table>
-<thead>
-<tr>
-<th>Add-on</th>
-<th>Current config directory</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>rtl_433</code></td>
-<td><code>/addon_configs/rtl433/</code></td>
-</tr>
-<tr>
-<td><code>rtl_433 (next)</code></td>
-<td><code>/addon_configs/rtl433-next/</code></td>
-</tr>
-</tbody>
-</table>
+<p>Move any per-radio tuning into <code>&lt;id&gt;.conf</code> files in the add-on config directory, <code>/addon_configs/&lt;slug&gt;/</code>. The add-on logs that directory with its <code>&lt;slug&gt;</code> filled in each time it starts.</p>
 <p>There is no separate config file required for the default case. The default rtl_433 config is baked into the image, and per-radio files only contain overrides or manual device declarations.</p>
 <h2 id="generated-documentation-branch">Generated Documentation Branch<a class="headerlink" href="#generated-documentation-branch" title="Permanent link">&para;</a></h2>
 <p><em>This section is for contributors editing these docs, not for add-on users.</em></p>
@@ -717,7 +699,7 @@ frequency 433.92M
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy", "navigation.sections"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>
