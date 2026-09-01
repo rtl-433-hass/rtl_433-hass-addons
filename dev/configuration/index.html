@@ -675,9 +675,12 @@
 <p><strong>You cannot add a single decoder on top of the defaults.</strong> Protocol selection is only ever subtractive or exclusive, never additive: a <code>protocol -&lt;n&gt;</code> line turns one decoder off, while a positive <code>protocol &lt;n&gt;</code> line switches rtl_433 into "only these protocols" mode. So an override such as <code>protocol 40</code> decodes <strong>only</strong> protocol 40 and drops everything else; it does not add protocol 40 to the defaults.</p>
 <h2 id="per-radio-overrides">Per-Radio Overrides<a class="headerlink" href="#per-radio-overrides" title="Permanent link">&para;</a></h2>
 <p>Each detected radio's exact override filename is printed in the add-on log:</p>
-<div class="highlight"><pre><span></span><code>Radio &lt;id&gt; -&gt; HTTP port &lt;port&gt;. To customize, create /config/&lt;id&gt;.conf.
+<div class="highlight"><pre><span></span><code>Radio &lt;id&gt; -&gt; HTTP port &lt;port&gt;. To customize, create /addon_configs/&lt;slug&gt;/&lt;id&gt;.conf.
 </code></pre></div>
-<p>Create <code>&lt;id&gt;.conf</code> in the add-on config directory, not in Home Assistant's main config directory:</p>
+<p>That path is the one to use as-is: the add-on resolves its own slug at startup and prints the directory the way you see it from Home Assistant (the File Editor, Samba, or the VS Code add-on). The add-on also logs the directory once on its own line when it starts:</p>
+<div class="highlight"><pre><span></span><code>Add-on configuration directory: /addon_configs/&lt;slug&gt;/ (browse it with the File Editor, Samba, or the VS Code add-on; it is NOT Home Assistant's own /config folder).
+</code></pre></div>
+<p>The <code>&lt;slug&gt;</code> is the add-on's full Supervisor slug: an eight-character hash of the add-on repository URL you added, followed by <code>_rtl433</code> or <code>_rtl433-next</code>. Adding the repository exactly as <a href="../installation/#add-the-repository">the installation instructions</a> give it produces:</p>
 <table>
 <thead>
 <tr>
@@ -688,15 +691,16 @@
 <tbody>
 <tr>
 <td><code>rtl_433</code></td>
-<td><code>/addon_configs/rtl433/</code></td>
+<td><code>/addon_configs/f3f2f05c_rtl433/</code></td>
 </tr>
 <tr>
 <td><code>rtl_433 (next)</code></td>
-<td><code>/addon_configs/rtl433-next/</code></td>
+<td><code>/addon_configs/f3f2f05c_rtl433-next/</code></td>
 </tr>
 </tbody>
 </table>
-<p>The add-on log refers to this directory as <code>/config</code> because that is its path <em>inside the add-on container</em>. From Home Assistant — the File Editor, Samba, or the VS Code add-on — the same directory is <code>/addon_configs/&lt;slug&gt;/</code>, <strong>not</strong> Home Assistant's own top-level <code>/config</code> folder. Both are called <code>/config</code> from different vantage points, so always create <code>&lt;id&gt;.conf</code> under <code>/addon_configs/...</code>.</p>
+<p>The hash covers the URL string character for character, so adding the repository with a trailing slash or a <code>.git</code> suffix — or installing the add-on locally — yields a different prefix. Treat the table as the typical case and the path in the add-on log as authoritative.</p>
+<p>Inside the add-on container that same directory is mounted at <code>/config</code>, but Home Assistant's own top-level <code>/config</code> folder is a different directory entirely, so always create <code>&lt;id&gt;.conf</code> under <code>/addon_configs/...</code>.</p>
 <p>Put only the extra directives you want in the override file. The add-on appends the override to the internal default config, and rtl_433 applies the last matching directive.</p>
 <p>Example:</p>
 <div class="highlight"><pre><span></span><code>frequency 868M

@@ -617,11 +617,12 @@
 <li>Start the add-on.</li>
 <li>Open the add-on log and look for one line per radio similar to:</li>
 </ol>
-<div class="highlight"><pre><span></span><code>Radio &lt;id&gt; -&gt; HTTP port &lt;port&gt;. To customize, create /config/&lt;id&gt;.conf.
+<div class="highlight"><pre><span></span><code>Add-on configuration directory: /addon_configs/&lt;slug&gt;/ (browse it with the File Editor, Samba, or the VS Code add-on; it is NOT Home Assistant's own /config folder).
+Radio &lt;id&gt; -&gt; HTTP port &lt;port&gt;. To customize, create /addon_configs/&lt;slug&gt;/&lt;id&gt;.conf.
 Radio &lt;id&gt;: unique_id=&lt;serial:...|usbpath:...&gt; host=&lt;host&gt; port=&lt;port&gt;
 </code></pre></div>
 <p>The <code>&lt;id&gt;</code> identifies the radio for per-radio override files. The <code>unique_id</code> — shown as either a <code>serial:</code> or a <code>usbpath:</code> value — together with the host and port identifies the radio for the Home Assistant integration.</p>
-<p>The log writes the override path as <code>/config/&lt;id&gt;.conf</code>. That is the path <em>inside the add-on</em>; when you browse from Home Assistant (File Editor, Samba, or the VS Code add-on) the same file lives at <code>/addon_configs/&lt;slug&gt;/&lt;id&gt;.conf</code>, <strong>not</strong> in Home Assistant's own <code>/config</code> folder. See <a href="../configuration/#per-radio-overrides">Per-Radio Overrides</a>.</p>
+<p>The log prints the override path exactly as you see it from Home Assistant (File Editor, Samba, or the VS Code add-on), with <code>&lt;slug&gt;</code> already filled in. That directory is <strong>not</strong> Home Assistant's own <code>/config</code> folder. See <a href="../configuration/#per-radio-overrides">Per-Radio Overrides</a>.</p>
 <h2 id="connect-home-assistant">Connect Home Assistant<a class="headerlink" href="#connect-home-assistant" title="Permanent link">&para;</a></h2>
 <p>If the <a href="#install-the-integration-first">integration was installed first</a>, each detected radio appears as a discovered <strong>rtl_433</strong> card under <strong>Settings -&gt; Devices &amp; Services</strong>. Click <strong>Add</strong> and confirm — that's it.</p>
 <p>If no discovery card appears (for example, the integration was installed after the add-on started), install the integration, restart Home Assistant, and then restart the add-on so it republishes discovery. Alternatively, add one hub per radio manually with these values:</p>

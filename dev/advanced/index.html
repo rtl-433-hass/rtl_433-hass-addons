@@ -642,25 +642,7 @@ frequency 433.92M
 <p>The <code>radios</code> array is the current start's roster, not a durable inventory. A temporarily missing dongle is absent from that roster; consumers should treat a new unbound radio as the replacement signal rather than treating absence as permanent removal.</p>
 <h2 id="migration-from-the-old-config-path">Migration From the Old Config Path<a class="headerlink" href="#migration-from-the-old-config-path" title="Permanent link">&para;</a></h2>
 <p>Previous add-ons read config files from <code>/config/rtl_433/</code> in Home Assistant's main config directory. That path is no longer read.</p>
-<p>Move any per-radio tuning into <code>&lt;id&gt;.conf</code> files in the add-on config directory:</p>
-<table>
-<thead>
-<tr>
-<th>Add-on</th>
-<th>Current config directory</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>rtl_433</code></td>
-<td><code>/addon_configs/rtl433/</code></td>
-</tr>
-<tr>
-<td><code>rtl_433 (next)</code></td>
-<td><code>/addon_configs/rtl433-next/</code></td>
-</tr>
-</tbody>
-</table>
+<p>Move any per-radio tuning into <code>&lt;id&gt;.conf</code> files in the add-on config directory, <code>/addon_configs/&lt;slug&gt;/</code>. The add-on logs that directory with its <code>&lt;slug&gt;</code> filled in each time it starts.</p>
 <p>There is no separate config file required for the default case. The default rtl_433 config is baked into the image, and per-radio files only contain overrides or manual device declarations.</p>
 <h2 id="generated-documentation-branch">Generated Documentation Branch<a class="headerlink" href="#generated-documentation-branch" title="Permanent link">&para;</a></h2>
 <p><em>This section is for contributors editing these docs, not for add-on users.</em></p>
