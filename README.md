@@ -35,3 +35,21 @@ Releases are automated with [release-please](https://github.com/googleapis/relea
 3. Merge the release PR. release-please then tags the release (`v<semver>`, e.g. `v0.1.1`) and creates a GitHub Release, which triggers the stable addon build.
 
 That's it! No branch reconciliation needed. Stable users see "Update Available" when the new version is published.
+
+## Pull request documentation previews
+
+Netlify builds the documentation using `netlify.toml` and publishes `site/`.
+The build uses Python 3.14 and `docs/requirements.txt`, then runs
+`mkdocs build --strict` from the repository root. The preview opens the branch's
+current documentation directly, without the published version directories.
+
+To enable previews, create a Netlify project by importing this GitHub repository,
+select `main` as the production branch, and keep Deploy Previews enabled for pull
+requests. Netlify reads the build settings from `netlify.toml` once it is merged.
+Each PR gets a URL such as `https://deploy-preview-123--your-project.netlify.app`.
+No additional GitHub Actions workflow or Netlify API token is required.
+The existing GitHub Pages workflow continues to publish the versioned docs;
+Netlify also publishes `main` at its own `netlify.app` URL.
+
+See Netlify's [repository setup guide](https://docs.netlify.com/start/quickstarts/deploy-from-repository/)
+and [Deploy Preview documentation](https://docs.netlify.com/deploy/deploy-types/deploy-previews/).
